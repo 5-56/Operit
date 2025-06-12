@@ -11,6 +11,8 @@ import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.ToolExecutionState
 import com.ai.assistance.operit.util.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +33,7 @@ class MessageProcessingDelegate(
 ) {
     companion object {
         private const val TAG = "MessageProcessingDelegate"
+        private const val UI_UPDATE_INTERVAL = 500L // 0.5 seconds in milliseconds
     }
 
     // State flows
@@ -46,21 +49,30 @@ class MessageProcessingDelegate(
     private val _inputProcessingMessage = MutableStateFlow("")
     val inputProcessingMessage: StateFlow<String> = _inputProcessingMessage.asStateFlow()
 
+    // 用于批处理UI更新的变量
+    private var batchedAiContent: String = ""
+    private var lastAiUpdateTime: Long = 0
+    private var updateJob: Job? = null
+
+    // 上一条AI消息的引用，用于直接修改而不是创建新对象
+    private var lastAiMessage: ChatMessage? = null
+
     /** 更新用户消息 */
     fun updateUserMessage(message: String) {
         _userMessage.value = message
     }
 
     /** 向AI发送用户消息(无附件版本) 为了保持向后兼容性 */
-    fun sendUserMessage() {
-        sendUserMessage(emptyList())
+    fun sendUserMessage(chatId: String? = null) {
+        sendUserMessage(emptyList(), chatId)
     }
 
     /**
      * 向AI发送用户消息(带附件版本)
      * @param attachments 要发送的附件列表
+     * @param chatId 当前聊天ID，用于Web工作区
      */
-    fun sendUserMessage(attachments: List<AttachmentInfo> = emptyList()) {
+    fun sendUserMessage(attachments: List<AttachmentInfo> = emptyList(), chatId: String? = null) {
         if (_userMessage.value.isBlank() && attachments.isEmpty()) {
             return
         }
@@ -148,7 +160,8 @@ class MessageProcessingDelegate(
                             handlePartialResponse(content, thinking)
                         },
                         chatHistory = history,
-                        onComplete = { handleResponseComplete() }
+                        onComplete = { handleResponseComplete() },
+                        chatId = chatId // 传递chatId参数
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "发送消息时出错", e)
@@ -157,6 +170,7 @@ class MessageProcessingDelegate(
             }
         }
     }
+    var lastThinking: String? = null
 
     /** 处理AI部分响应 */
     private fun handlePartialResponse(content: String, thinking: String?) {
@@ -167,7 +181,8 @@ class MessageProcessingDelegate(
                 return
             }
 
-            if (thinking != null && getShowThinking()) {
+            if (thinking != null && getShowThinking() && thinking != lastThinking) {
+                lastThinking = thinking
                 // 更新或添加思考消息
                 val chatHistory = getChatHistory()
                 val lastUserIndex = chatHistory.indexOfLast { it.sender == "user" }
@@ -183,72 +198,150 @@ class MessageProcessingDelegate(
                 }
             }
 
-            // 处理AI响应内容
+            // 处理AI响应内容（现在content是完整内容而非增量内容）
             if (content.isNotEmpty()) {
-                val trimmedContent = content.trim()
-                if (trimmedContent.isNotBlank()) {
-                    // 检查最后一条用户消息后是否已有AI回复
-                    val chatHistory = getChatHistory()
-                    val lastUserIndex = chatHistory.indexOfLast { it.sender == "user" }
-                    val lastAiIndex = chatHistory.indexOfLast { it.sender == "ai" }
+                // 输出消息日志
+                Log.d(TAG, "收到消息: 长度=${content.length}")
 
-                    if (lastAiIndex > lastUserIndex) {
-                        // 这是本轮对话中的后续响应，更新已有AI回复
-                        val updatedAiMessage = ChatMessage("ai", trimmedContent)
-                        addMessageToChat(updatedAiMessage)
-                    } else {
-                        // 这是本轮对话的第一个AI回复，创建新消息
-                        addMessageToChat(ChatMessage("ai", trimmedContent))
-                    }
+                // 获取当前时间
+                val currentTime = System.currentTimeMillis()
+
+                // 如果没有活跃的更新任务或者距离上次更新已经超过了间隔时间，则创建新的更新任务
+                if (updateJob == null || currentTime - lastAiUpdateTime >= UI_UPDATE_INTERVAL) {
+                    // 取消现有的更新任务（如果有）
+                    updateJob?.cancel()
+
+                    // 创建新的更新任务
+                    updateJob =
+                            viewModelScope.launch {
+                                // 更新最后更新时间
+                                lastAiUpdateTime = System.currentTimeMillis()
+
+                                // 处理新内容(非增量)
+                                appendAiContent(content)
+
+                                // 等待下一个更新间隔
+                                delay(UI_UPDATE_INTERVAL)
+
+                                // 任务完成
+                                updateJob = null
+                            }
+                } else {
+                    // 保存最新内容到批处理缓冲区(非增量模式下直接替换而不是追加)
+                    batchedAiContent = content // 直接替换为最新内容
+                    Log.d(TAG, "批处理缓冲区更新: 内容长度=${batchedAiContent.length}")
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "处理AI响应时发生未处理错误", e)
-            // 修改：将内部处理错误也通过错误回调通知上层
             showErrorMessage("处理AI响应时发生错误: ${e.message}")
-            // 确保错误不会中断UI更新
+        }
+    }
+
+    /** 追加AI内容到消息 */
+    private fun appendAiContent(newContent: String) {
+        // 如果没有内容，直接返回
+        if (newContent.isEmpty()) return
+
+        // 获取当前聊天历史
+        val chatHistory = getChatHistory()
+        val lastUserIndex = chatHistory.indexOfLast { it.sender == "user" }
+
+        val contentToUse =
+                if (batchedAiContent.isNotEmpty()) {
+                    batchedAiContent = ""
+                    newContent
+                } else {
+                    newContent
+                }
+
+        if (lastAiMessage != null) {
+            val newMessage =
+                    ChatMessage(
+                            sender = "ai",
+                            content = contentToUse,
+                            timestamp = lastAiMessage?.timestamp ?: System.currentTimeMillis()
+                    )
+            lastAiMessage = newMessage
+            addMessageToChat(newMessage)
+        } else {
+            val lastAiIndex = chatHistory.indexOfLast { it.sender == "ai" }
+            if (lastAiIndex > lastUserIndex && lastAiIndex >= 0) {
+                val existingMessage = chatHistory[lastAiIndex]
+                val newMessage =
+                        ChatMessage(
+                                sender = "ai",
+                                content = contentToUse,
+                                timestamp = existingMessage.timestamp
+                        )
+                lastAiMessage = newMessage
+                addMessageToChat(newMessage)
+            } else {
+                val newMessage = ChatMessage("ai", contentToUse)
+                lastAiMessage = newMessage
+                addMessageToChat(newMessage)
+            }
         }
     }
 
     /** 处理AI响应完成 */
     private fun handleResponseComplete() {
-        _isLoading.value = false
+        // 取消任何待处理的更新任务
+        updateJob?.cancel()
+        updateJob = null
 
-        // 更新聊天统计信息
-        updateChatStatistics()
+        try {
+            // 确保最终内容被更新到UI
+            if (batchedAiContent.isNotBlank()) {
+                appendAiContent(batchedAiContent)
+                batchedAiContent = "" // 清空批处理缓冲区
+            }
 
-        // 保存当前聊天
-        saveCurrentChat()
+            // 重置变量前，先更新聊天统计和保存
+            _isLoading.value = false
+
+            // 更新统计数据并保存
+            updateChatStatistics()
+            saveCurrentChat() // 恢复保存，因为我们现在不会重复创建消息
+        } catch (e: Exception) {
+            Log.e(TAG, "处理响应完成时发生错误", e)
+        } finally {
+            // 无论如何都要重置状态变量
+            lastAiUpdateTime = 0
+            lastAiMessage = null // 重置消息引用
+        }
     }
 
     /** 取消当前对话 */
     fun cancelCurrentMessage() {
         viewModelScope.launch {
+            // 取消任何待处理的更新任务
+            updateJob?.cancel()
+            updateJob = null
+
+            // 重置批处理变量
+            batchedAiContent = ""
+            lastAiUpdateTime = 0
+            lastAiMessage = null // 重置消息引用
+
+            // 首先设置标志，避免其他操作继续处理
+            _isLoading.value = false
+            _isProcessingInput.value = false
+            _inputProcessingMessage.value = ""
+
+            // 取消当前的AI响应
             try {
-                // 首先设置标志，避免其他操作继续处理
-                _isLoading.value = false
-                _isProcessingInput.value = false
-                _inputProcessingMessage.value = ""
-
-                // 取消当前的AI响应
-                try {
-                    getEnhancedAiService()?.cancelConversation()
-                    Log.d(TAG, "成功取消AI对话")
-                } catch (e: Exception) {
-                    Log.e(TAG, "取消对话时发生错误", e)
-                    // 修改：将取消对话的错误也通过错误回调通知上层
-                    showErrorMessage("取消对话时发生错误: ${e.message}")
-                    // 即使出错也继续后续处理
-                }
-
-                // 保存当前对话
-                saveCurrentChat()
-
-                Log.d(TAG, "取消流程完成")
+                getEnhancedAiService()?.cancelConversation()
+                Log.d(TAG, "成功取消AI对话")
             } catch (e: Exception) {
-                showErrorMessage("取消对话失败: ${e.message}")
-                Log.e(TAG, "取消对话过程中发生错误", e)
+                Log.e(TAG, "取消对话时发生错误", e)
+                showErrorMessage("取消对话时发生错误: ${e.message}")
             }
+
+            // 保存当前对话
+            saveCurrentChat()
+
+            Log.d(TAG, "取消流程完成")
         }
     }
 

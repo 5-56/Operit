@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.data.preferences
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -12,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ParameterCategory
 import com.ai.assistance.operit.data.model.ParameterValueType
+import com.ai.assistance.operit.data.model.ApiProviderType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -30,6 +32,7 @@ class ApiPreferences(private val context: Context) {
         val API_KEY = stringPreferencesKey("api_key")
         val API_ENDPOINT = stringPreferencesKey("api_endpoint")
         val MODEL_NAME = stringPreferencesKey("model_name")
+        val API_PROVIDER_TYPE = stringPreferencesKey("api_provider_type")
         val SHOW_THINKING = booleanPreferencesKey("show_thinking")
         val MEMORY_OPTIMIZATION = booleanPreferencesKey("memory_optimization")
         val PREFERENCE_ANALYSIS_INPUT_TOKENS = intPreferencesKey("preference_analysis_input_tokens")
@@ -65,6 +68,7 @@ class ApiPreferences(private val context: Context) {
         const val DEFAULT_API_ENDPOINT = "https://api.deepseek.com/v1/chat/completions"
         const val DEFAULT_MODEL_NAME = "deepseek-chat"
         const val DEFAULT_API_KEY = "sk-e565390c164c4cfa8820624ef47d68bf"
+        const val DEFAULT_API_PROVIDER_TYPE = "DEEPSEEK"
         const val DEFAULT_SHOW_THINKING = true
         const val DEFAULT_MEMORY_OPTIMIZATION = true
         const val DEFAULT_SHOW_FPS_COUNTER = false
@@ -108,6 +112,16 @@ class ApiPreferences(private val context: Context) {
     val modelNameFlow: Flow<String> =
             context.apiDataStore.data.map { preferences ->
                 preferences[MODEL_NAME] ?: DEFAULT_MODEL_NAME
+            }
+
+    // Get API Provider Type as Flow
+    val apiProviderTypeFlow: Flow<ApiProviderType> =
+            context.apiDataStore.data.map { preferences ->
+                try {
+                    ApiProviderType.valueOf(preferences[API_PROVIDER_TYPE] ?: DEFAULT_API_PROVIDER_TYPE)
+                } catch (e: Exception) {
+                    ApiProviderType.DEEPSEEK
+                }
             }
 
     // Get Show Thinking as Flow
@@ -246,6 +260,13 @@ class ApiPreferences(private val context: Context) {
         context.apiDataStore.edit { preferences -> preferences[MODEL_NAME] = modelName }
     }
 
+    // Save API Provider Type
+    suspend fun saveApiProviderType(apiProviderType: ApiProviderType) {
+        context.apiDataStore.edit { preferences ->
+            preferences[API_PROVIDER_TYPE] = apiProviderType.name
+        }
+    }
+
     // Save Show Thinking setting
     suspend fun saveShowThinking(showThinking: Boolean) {
         context.apiDataStore.edit { preferences -> preferences[SHOW_THINKING] = showThinking }
@@ -333,6 +354,16 @@ class ApiPreferences(private val context: Context) {
             preferences[API_KEY] = apiKey
             preferences[API_ENDPOINT] = endpoint
             preferences[MODEL_NAME] = modelName
+        }
+    }
+
+    // 添加包含ApiProviderType参数的新saveApiSettings方法
+    suspend fun saveApiSettings(apiKey: String, endpoint: String, modelName: String, apiProviderType: ApiProviderType) {
+        context.apiDataStore.edit { preferences ->
+            preferences[API_KEY] = apiKey
+            preferences[API_ENDPOINT] = endpoint
+            preferences[MODEL_NAME] = modelName
+            preferences[API_PROVIDER_TYPE] = apiProviderType.name
         }
     }
 
@@ -540,7 +571,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.INT,
                         minValue = 1,
                         maxValue = 16000,
-                        icon = "text_format",
                         category = ParameterCategory.GENERATION
                 )
         )
@@ -558,7 +588,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.FLOAT,
                         minValue = 0.0f,
                         maxValue = 2.0f,
-                        icon = "thermostat",
                         category = ParameterCategory.CREATIVITY
                 )
         )
@@ -576,7 +605,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.FLOAT,
                         minValue = 0.0f,
                         maxValue = 1.0f,
-                        icon = "filter_alt",
                         category = ParameterCategory.CREATIVITY
                 )
         )
@@ -594,7 +622,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.INT,
                         minValue = 0,
                         maxValue = 100,
-                        icon = "filter_list",
                         category = ParameterCategory.CREATIVITY
                 )
         )
@@ -612,7 +639,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.FLOAT,
                         minValue = -2.0f,
                         maxValue = 2.0f,
-                        icon = "repeat",
                         category = ParameterCategory.REPETITION
                 )
         )
@@ -630,7 +656,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.FLOAT,
                         minValue = -2.0f,
                         maxValue = 2.0f,
-                        icon = "stacked_bar_chart",
                         category = ParameterCategory.REPETITION
                 )
         )
@@ -650,7 +675,6 @@ class ApiPreferences(private val context: Context) {
                         valueType = ParameterValueType.FLOAT,
                         minValue = 0.0f,
                         maxValue = 2.0f,
-                        icon = "filter_none",
                         category = ParameterCategory.REPETITION
                 )
         )
@@ -767,6 +791,16 @@ class ApiPreferences(private val context: Context) {
         context.apiDataStore.edit { preferences ->
             preferences[PREFERENCE_ANALYSIS_INPUT_TOKENS] = 0
             preferences[PREFERENCE_ANALYSIS_OUTPUT_TOKENS] = 0
+        }
+    }
+
+    // 添加确保初始化API提供商类型的方法
+    suspend fun ensureApiProviderTypeInitialized() {
+        // 检查API提供商类型是否已设置，如果没有则设置默认值
+        val preferences = context.apiDataStore.data.first()
+        if (preferences[API_PROVIDER_TYPE] == null) {
+            Log.d("ApiPreferences", "初始化默认API提供商类型: $DEFAULT_API_PROVIDER_TYPE")
+            saveApiProviderType(ApiProviderType.DEEPSEEK)
         }
     }
 }

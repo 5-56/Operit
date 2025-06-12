@@ -55,7 +55,6 @@ object TermuxCommandExecutionImpl {
      * 执行Termux命令 (使用流式输出) 该方法会默认使用流式输出模式，替代旧的executeCommand方法
      * @param context 上下文
      * @param command 要执行的命令
-     * @param autoAuthorize 如果Termux未授权，是否自动尝试授权
      * @param background 是否在后台执行命令
      * @param outputReceiver 命令输出接收器，用于接收实时输出
      * @param resultCallback 命令执行结果回调，在不提供outputReceiver时使用
@@ -65,7 +64,6 @@ object TermuxCommandExecutionImpl {
     suspend fun executeCommandStreaming(
             context: Context,
             command: String,
-            autoAuthorize: Boolean = true,
             background: Boolean = true,
             outputReceiver: TermuxCommandOutputReceiver? = null,
             resultCallback: ((CommandResult) -> Unit)? = null,
@@ -74,16 +72,16 @@ object TermuxCommandExecutionImpl {
             withContext(Dispatchers.IO) {
                 try {
                     // 检查应用是否在前台运行
-                    if (!TermuxUtils.isAppInForeground(context)) {
-                        Log.w(TAG, createLogMessage(command, "应用在后台运行，无法启动Termux服务"))
+                    if (!TermuxUtils.isTermuxRunning(context)) {
+                        Log.w(TAG, createLogMessage(command, "应用未启动，无法启动Termux服务"))
                         val errorResult =
                                 CommandResult(
                                         success = false,
                                         stdout = "",
-                                        stderr = "应用在后台运行，无法启动Termux服务。请确保应用在前台运行或使用ADB方式直接执行命令",
+                                        stderr = "应用未启动，无法启动Termux服务。请确保应用在前台运行或使用ADB方式直接执行命令",
                                         exitCode = -1
                                 )
-                        outputReceiver?.onError("应用在后台运行，无法启动Termux服务", -1)
+                        outputReceiver?.onError("应用未启动，无法启动Termux服务", -1)
                         return@withContext errorResult
                     }
 
@@ -104,10 +102,7 @@ object TermuxCommandExecutionImpl {
                     }
 
                     // 检查是否已授权，如果需要则尝试授权
-                    if (autoAuthorize && !TermuxAuthorizer.isTermuxAuthorized(context)) {
-                        Log.i(TAG, createLogMessage(command, "尝试授权Termux"))
-                        val authorized = TermuxAuthorizer.authorizeTermux(context)
-                        if (!authorized) {
+                    if (!TermuxAuthorizer.isTermuxAuthorized(context)) {
                             Log.e(TAG, createLogMessage(command, "授权Termux失败"))
                             val errorResult =
                                     CommandResult(
@@ -118,7 +113,6 @@ object TermuxCommandExecutionImpl {
                                     )
                             outputReceiver?.onError("Failed to authorize Termux", -1)
                             return@withContext errorResult
-                        }
                     }
 
                     // 内部执行逻辑块

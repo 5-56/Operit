@@ -2,9 +2,6 @@ package com.ai.assistance.operit.ui.features.demo.viewmodel
 
 import android.app.Application
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
@@ -14,9 +11,14 @@ import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.core.tools.system.RootAuthorizer
+import com.ai.assistance.operit.core.tools.system.termux.TermuxAuthorizer
 import com.ai.assistance.operit.ui.features.demo.state.DemoStateManager
+import com.ai.assistance.operit.ui.features.demo.utils.TermuxDemoUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** ViewModel for the ShizukuDemoScreen Delegates most state management to DemoStateManager */
 class ShizukuDemoViewModel(application: Application) : AndroidViewModel(application) {
@@ -61,6 +63,39 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
         stateManager.initialize()
     }
 
+    /** Set loading state */
+    fun setLoading(isLoading: Boolean) {
+        stateManager.setLoading(isLoading)
+    }
+
+    /** Initialize the ViewModel with context data (Async version) */
+    fun initializeAsync(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 初始化Root授权器 - 在IO线程进行初始化
+                RootAuthorizer.initialize(context)
+
+                // 注意：initialize已经内部调用了checkRootStatus，这里不需要再次检查
+                // 直接从RootAuthorizer获取当前状态
+                val isDeviceRooted = RootAuthorizer.isRooted.value
+                val hasRootAccess = RootAuthorizer.hasRootAccess.value
+
+                // 更新状态
+                withContext(Dispatchers.Main) {
+                    stateManager.updateRootStatus(isDeviceRooted, hasRootAccess)
+                }
+
+                // 调用stateManager的异步初始化方法
+                stateManager.initializeAsync()
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "初始化时出错: ${e.message}", e)
+            } finally {
+                // 完成后关闭加载指示器
+                withContext(Dispatchers.Main) { setLoading(false) }
+            }
+        }
+    }
+
     /** Refresh app status */
     fun refreshStatus(context: Context) {
         // 检查Root状态
@@ -97,10 +132,10 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                 executeRootCommand("id", context)
                 return@launch
             }
-            
+
             // 如果没有Root权限，则先请求权限
             Toast.makeText(context, "正在请求Root权限...", Toast.LENGTH_SHORT).show()
-            
+
             RootAuthorizer.requestRootPermission { granted ->
                 viewModelScope.launch {
                     if (granted) {
@@ -110,7 +145,7 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                     } else {
                         Toast.makeText(context, "Root权限请求被拒绝", Toast.LENGTH_SHORT).show()
                     }
-                    
+
                     // 刷新状态
                     checkRootStatus(context)
                 }
@@ -229,12 +264,27 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                // Implementation of configureTunaSource
-                updateOutputText("${outputText.value}\n开始配置清华源...")
+                // Call the actual implementation
+                val result =
+                        TermuxDemoUtil.configureTunaSource(
+                                context = context,
+                                updateOutputText = { text -> updateOutputText(text) },
+                                updateSourceStatus = { enabled -> updateSourceStatus(enabled) },
+                                updateConfigStatus = { configured ->
+                                    updateConfigStatus(configured)
+                                },
+                                isTunaSourceEnabled = isTunaSourceEnabled.value,
+                                isPythonInstalled = isPythonInstalled.value,
+                                isUvInstalled = isUvInstalled.value,
+                                isNodeInstalled = isNodeInstalled.value,
+                                currentOutputText = outputText.value
+                        )
 
-                // Simulate configuration
-                updateSourceStatus(true)
-                updateOutputText("${outputText.value}\n清华源配置成功")
+                // Update output text with the result
+                updateOutputText(result)
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "配置清华源时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n配置清华源时出错: ${e.message}")
             } finally {
                 endConfiguration()
             }
@@ -253,12 +303,27 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                // Implementation of installPython
-                updateOutputText("${outputText.value}\n开始安装Python...")
+                // Call the actual implementation
+                val result =
+                        TermuxDemoUtil.installPython(
+                                context = context,
+                                updateOutputText = { text -> updateOutputText(text) },
+                                updatePythonStatus = { installed -> updatePythonStatus(installed) },
+                                updateConfigStatus = { configured ->
+                                    updateConfigStatus(configured)
+                                },
+                                isTunaSourceEnabled = isTunaSourceEnabled.value,
+                                isPythonInstalled = isPythonInstalled.value,
+                                isUvInstalled = isUvInstalled.value,
+                                isNodeInstalled = isNodeInstalled.value,
+                                currentOutputText = outputText.value
+                        )
 
-                // Simulate installation
-                updatePythonStatus(true)
-                updateOutputText("${outputText.value}\nPython安装成功")
+                // Update output text with the result
+                updateOutputText(result)
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "安装Python时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n安装Python时出错: ${e.message}")
             } finally {
                 endConfiguration()
             }
@@ -277,12 +342,27 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                // Implementation of installUv
-                updateOutputText("${outputText.value}\n开始安装UV...")
+                // Call the actual implementation
+                val result =
+                        TermuxDemoUtil.installUv(
+                                context = context,
+                                updateOutputText = { text -> updateOutputText(text) },
+                                updateUvStatus = { installed -> updateUvStatus(installed) },
+                                updateConfigStatus = { configured ->
+                                    updateConfigStatus(configured)
+                                },
+                                isTunaSourceEnabled = isTunaSourceEnabled.value,
+                                isPythonInstalled = isPythonInstalled.value,
+                                isUvInstalled = isUvInstalled.value,
+                                isNodeInstalled = isNodeInstalled.value,
+                                currentOutputText = outputText.value
+                        )
 
-                // Simulate installation
-                updateUvStatus(true)
-                updateOutputText("${outputText.value}\nUV安装成功")
+                // Update output text with the result
+                updateOutputText(result)
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "安装UV时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n安装UV时出错: ${e.message}")
             } finally {
                 endConfiguration()
             }
@@ -301,12 +381,27 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                // Implementation of installNode
-                updateOutputText("${outputText.value}\n开始安装Node.js...")
+                // Call the actual implementation
+                val result =
+                        TermuxDemoUtil.installNode(
+                                context = context,
+                                updateOutputText = { text -> updateOutputText(text) },
+                                updateNodeStatus = { installed -> updateNodeStatus(installed) },
+                                updateConfigStatus = { configured ->
+                                    updateConfigStatus(configured)
+                                },
+                                isTunaSourceEnabled = isTunaSourceEnabled.value,
+                                isPythonInstalled = isPythonInstalled.value,
+                                isUvInstalled = isUvInstalled.value,
+                                isNodeInstalled = isNodeInstalled.value,
+                                currentOutputText = outputText.value
+                        )
 
-                // Simulate installation
-                updateNodeStatus(true)
-                updateOutputText("${outputText.value}\nNode.js安装成功")
+                // Update output text with the result
+                updateOutputText(result)
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "安装Node.js时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n安装Node.js时出错: ${e.message}")
             } finally {
                 endConfiguration()
             }
@@ -325,23 +420,24 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                // Implementation of requestTermuxBatteryOptimization
+                // Call the actual battery optimization exemption request
+                TermuxDemoUtil.requestTermuxBatteryOptimization(context)
+
                 updateOutputText("${outputText.value}\n开始设置Termux电池优化豁免...")
                 updateOutputText(
                         "${outputText.value}\n已打开Termux电池优化设置页面。请在系统设置中点击「允许」以豁免Termux的电池优化。"
                 )
                 updateOutputText("${outputText.value}\n完成设置后，请返回本应用并点击刷新按钮检查状态。")
 
-                // Open battery optimization settings for Termux
-                try {
-                    val intent =
-                            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                data = Uri.parse("package:com.termux")
-                            }
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    updateOutputText("${outputText.value}\n无法打开电池优化设置: ${e.message}")
+                // After requesting the exemption, check the status
+                val isExempted = TermuxDemoUtil.checkTermuxBatteryOptimization(context)
+                if (isExempted) {
+                    updateBatteryStatus(true)
+                    updateOutputText("${outputText.value}\nTermux已成功获得电池优化豁免！")
                 }
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "设置Termux电池优化豁免时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n无法打开电池优化设置: ${e.message}")
             } finally {
                 endConfiguration()
             }
@@ -353,14 +449,28 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
             startConfiguration("授权Termux")
 
             try {
-                // Implementation of authorizeTermux
-                updateOutputText("${outputText.value}\n开始授权Termux...")
+                // Call the actual authorization logic
+                val result =
+                        TermuxDemoUtil.authorizeTermux(
+                                context = context,
+                                updateOutputText = { text -> updateOutputText(text) },
+                                updateTermuxAuthorized = { authorized ->
+                                    stateManager.uiState.value.isTermuxAuthorized.value = authorized
+                                },
+                                updateTermuxRunning = { running ->
+                                    stateManager.isTermuxRunning.value = running
+                                },
+                                currentOutputText = outputText.value
+                        )
 
-                // After successful authorization
-                updateOutputText("${outputText.value}\nTermux授权成功")
+                // Update output text with the result from authorizeTermux
+                updateOutputText(result)
 
-                // Check installed components after successful authorization
+                // Check installed components after authorization attempt
                 checkInstalledComponents(context)
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "授权Termux时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n授权Termux时出错: ${e.message}")
             } finally {
                 endConfiguration()
             }
@@ -373,12 +483,107 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
                 val intent = context.packageManager.getLaunchIntentForPackage("com.termux")
                 if (intent != null) {
                     context.startActivity(intent)
+                    // Set Termux as running immediately to improve UI responsiveness
                     stateManager.isTermuxRunning.value = true
+
+                    // Check if Termux was previously fully configured
+                    val cachedFullyConfigured = TermuxDemoUtil.getTermuxConfigStatus(context)
+
+                    if (cachedFullyConfigured) {
+                        // Give Termux a moment to start up
+                        delay(500)
+
+                        // If it was previously fully configured, we can assume it's already
+                        // authorized
+                        // Just restore the fully configured state directly
+                        stateManager.uiState.value.isTermuxAuthorized.value = true
+                        stateManager.isTermuxFullyConfigured.value = true
+
+                        // Check installed components in background to update the UI
+                        checkInstalledComponents(context)
+                    }
                 } else {
                     Toast.makeText(context, "无法找到Termux应用", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "无法启动Termux应用", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun deleteTermuxConfigAndStart(context: Context) {
+        viewModelScope.launch {
+            startConfiguration("删除Termux配置并启动")
+            
+            try {
+                // 首先删除Termux配置
+                updateOutputText("${outputText.value}\n正在删除Termux配置...")
+                val deleteResult = TermuxAuthorizer.deleteTermuxConfig(context)
+                
+                updateOutputText("${outputText.value}\n配置已删除，正在启动Termux...")
+                
+                // 然后启动Termux
+                val intent = context.packageManager.getLaunchIntentForPackage("com.termux")
+                if (intent != null) {
+                    context.startActivity(intent)
+                    // 设置Termux为运行状态以提高UI响应性
+                    stateManager.isTermuxRunning.value = true
+                    updateOutputText("${outputText.value}\nTermux已启动")
+                } else {
+                    updateOutputText("${outputText.value}\n无法找到Termux应用")
+                    Toast.makeText(context, "无法找到Termux应用", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "删除配置并启动Termux时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n操作失败: ${e.message}")
+                Toast.makeText(context, "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                endConfiguration()
+            }
+        }
+    }
+    
+    fun ensureTermuxRunningAndAuthorize(context: Context) {
+        viewModelScope.launch {
+            startConfiguration("确保Termux运行并授权")
+            
+            try {
+                // 首先检查Termux是否运行
+                if (!isTermuxRunning.value) {
+                    updateOutputText("${outputText.value}\nTermux未运行，请先启动Termux")
+                    Toast.makeText(context, "请先启动Termux", Toast.LENGTH_SHORT).show()
+                    endConfiguration()
+                    return@launch
+                }
+                
+                // 然后进行授权
+                updateOutputText("${outputText.value}\nTermux已运行，开始授权...")
+                
+                // 调用实际的授权逻辑
+                val result =
+                        TermuxDemoUtil.authorizeTermux(
+                                context = context,
+                                updateOutputText = { text -> updateOutputText(text) },
+                                updateTermuxAuthorized = { authorized ->
+                                    stateManager.uiState.value.isTermuxAuthorized.value = authorized
+                                },
+                                updateTermuxRunning = { running ->
+                                    stateManager.isTermuxRunning.value = running
+                                },
+                                currentOutputText = outputText.value
+                        )
+
+                // 更新输出文本
+                updateOutputText(result)
+
+                // 授权尝试后检查已安装的组件
+                checkInstalledComponents(context)
+            } catch (e: Exception) {
+                Log.e("ShizukuDemoViewModel", "确保Termux运行并授权时出错: ${e.message}", e)
+                updateOutputText("${outputText.value}\n操作失败: ${e.message}")
+                Toast.makeText(context, "操作失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                endConfiguration()
             }
         }
     }
@@ -417,8 +622,11 @@ class ShizukuDemoViewModel(application: Application) : AndroidViewModel(applicat
         // Re-register all default tools
         toolHandler.registerDefaultTools()
 
-        // Show a toast notification for feedback
-        Toast.makeText(context, "已重新注册所有工具", Toast.LENGTH_SHORT).show()
+        // Show a toast notification for feedback - using Main dispatcher to ensure it runs on the
+        // UI thread
+        viewModelScope.launch(Dispatchers.Main) {
+            Toast.makeText(context, "已重新注册所有工具", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** Cleanup when ViewModel is cleared */

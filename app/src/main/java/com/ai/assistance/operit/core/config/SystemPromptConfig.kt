@@ -28,6 +28,15 @@ object SystemPromptConfig {
       - Be honest about limitations; use tools to retrieve forgotten information instead of guessing, and clearly state when information is unavailable.
       - Use the query_problem_library tool to understand user's style, preferences, and past information.
 
+      WEB WORKSPACE GUIDELINES:
+      - Each conversation has its own web workspace directory at /sdcard/Download/Operit/workspace/{CHAT_ID}/
+      - You can create HTML, CSS, JS files in this directory using the write_file tool
+      - The main file should be named index.html at the root of this directory
+      - When the user clicks the web button in the UI, the contents of index.html will be displayed
+      - Users can further click an export button to export the web project as APK or EXE files
+      - You can create a web development environment for the user, with live preview capability
+      - Use relative paths in your HTML files for resources in the workspace directory
+
       FORMULA FORMATTING: For mathematical formulas, use $ $ for inline LaTeX and $$ $$ for block/display LaTeX equations.
 
       PLANNING_MODE_SECTION
@@ -90,11 +99,10 @@ object SystemPromptConfig {
       - get_supported_conversions: List all supported file format conversions. Parameters: format_type (optional, filter by type: "document"/"image"/"audio"/"video"/"archive")
 
       HTTP Tools:
-      - fetch_web_page: Retrieve web page content. Parameters: url (web page URL), format (text/html)
       - http_request: Send HTTP request. Parameters: url, method (GET/POST/PUT/DELETE), headers, body, body_type (json/form/text/xml)
       - multipart_request: Upload files. Parameters: url, method (POST/PUT), headers, form_data, files (file array)
       - manage_cookies: Manage cookies. Parameters: action (get/set/clear), domain, cookies
-      - web_search: Returns search results. Parameters: query (search term)
+      - visit_web: Visit webpage and extract its content. Parameters: url (webpage URL to visit)
 
       System Operation Tools:
       These tools require user authorization:
@@ -188,6 +196,15 @@ object SystemPromptConfig {
         - 自然地保持对话上下文，不要明确引用之前的交互。
         - 诚实地说明限制；使用工具检索遗忘的信息而不是猜测，并明确说明信息不可用的情况。
         - 使用query_problem_library工具了解用户的风格、偏好和过去的信息。
+
+        Web工作区指南：
+        - 每个对话都有自己的Web工作区目录，位于/sdcard/Download/Operit/workspace/{CHAT_ID}/
+        - 你可以使用write_file工具在此目录中创建HTML、CSS、JS文件
+        - 主文件应命名为index.html并位于此目录的根目录
+        - 当用户点击UI中的web按钮时，index.html的内容将被显示
+        - 用户可以进而点击导出按钮将web项目导出为APK和EXE文件
+        - 你可以为用户创建一个web开发环境，具有实时预览功能
+        - 在HTML文件中使用相对路径来引用工作区目录中的资源
         
         公式格式化：对于数学公式，使用 $ $ 包裹行内LaTeX公式，使用 $$ $$ 包裹独立成行的LaTeX公式。
         
@@ -251,11 +268,10 @@ object SystemPromptConfig {
         - get_supported_conversions: 列出所有支持的文件格式转换。参数：format_type（可选，按类型过滤："document"/"image"/"audio"/"video"/"archive"）
         
         HTTP工具：
-        - fetch_web_page: 获取网页内容。参数：url (网页URL), format (text/html)
         - http_request: 发送HTTP请求。参数：url, method (GET/POST/PUT/DELETE), headers, body, body_type (json/form/text/xml)
         - multipart_request: 上传文件。参数：url, method (POST/PUT), headers, form_data, files (文件数组)
         - manage_cookies: 管理cookies。参数：action (get/set/clear), domain, cookies
-        - web_search: 返回搜索结果。参数：query (搜索词)
+        - visit_web: 访问网页并提取内容。参数：url (要访问的网页URL)
         
         系统操作工具：
         这些工具需要用户授权：

@@ -27,7 +27,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatMessage
-import com.ai.assistance.operit.ui.common.displays.EnhancedMarkdownText
 import com.ai.assistance.operit.ui.common.displays.MarkdownTextComposable
 import com.ai.assistance.operit.ui.common.displays.MessageContentParser
 import com.ai.assistance.operit.ui.common.displays.MessageContentParser.Companion.ContentSegment
@@ -238,14 +237,9 @@ fun AiMessageComposable(
                                                             }
                                                     )
                             ) {
-                                EnhancedMarkdownText(
+                                MarkdownTextComposable(
                                         text = segment.content,
-                                        textColor = textColor,
-                                        onCodeCopied = {
-                                            haptic.performHapticFeedback(
-                                                HapticFeedbackType.LongPress
-                                            )
-                                        }
+                                        textColor = textColor
                                 )
                             }
                         }

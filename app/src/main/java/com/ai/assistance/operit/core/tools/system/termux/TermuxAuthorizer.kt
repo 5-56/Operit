@@ -10,7 +10,6 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
-import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,7 +63,6 @@ class TermuxAuthorizer {
 
         // 配置状态缓存
         private data class ConfigStatus(val isConfigured: Boolean, val lastCheckTime: Long)
-        private val configCache = AtomicReference<ConfigStatus?>(null)
 
         // 权限状态缓存
         private data class PermissionStatus(
@@ -77,60 +75,22 @@ class TermuxAuthorizer {
         )
         private val permissionCache = AtomicReference<PermissionStatus?>(null)
 
+        public suspend fun deleteTermuxConfig(context: Context) {
+            AndroidShellExecutor.executeShellCommand("run-as com.termux sh -c 'rm -rf $TERMUX_CONFIG_PATH'")
+        }
+
         /** 检查Termux配置 */
         private suspend fun checkTermuxConfig(): Boolean =
                 withContext(Dispatchers.IO) {
-                    // 检查缓存
-                    val currentTime = System.currentTimeMillis()
-                    val cached = configCache.get()
-                    if (cached != null && (currentTime - cached.lastCheckTime) < CACHE_EXPIRY_MS) {
-                        return@withContext cached.isConfigured
-                    }
-
-                    // 检查.termux目录是否存在
-                    val termuxDirExistsCommand =
-                            "run-as com.termux sh -c 'ls -d \"/data/data/com.termux/files/home/.termux\" 2>/dev/null && echo \"exists\"'"
-                    val termuxDirExistsResult =
-                            AndroidShellExecutor.executeShellCommand(termuxDirExistsCommand)
-
-                    if (!termuxDirExistsResult.success ||
-                                    !termuxDirExistsResult.stdout.contains("exists")
-                    ) {
-                        updateCache(false)
-                        return@withContext false
-                    }
-
-                    // 检查配置文件是否存在
-                    val configExistsCommand =
-                            "run-as com.termux sh -c 'ls \"$TERMUX_CONFIG_PATH\" 2>/dev/null && echo \"exists\"'"
-                    val configExistsResult =
-                            AndroidShellExecutor.executeShellCommand(configExistsCommand)
-
-                    if (!configExistsResult.success || !configExistsResult.stdout.contains("exists")
-                    ) {
-                        updateCache(false)
-                        return@withContext false
-                    }
-
-                    // 读取配置文件
-                    val readConfigCommand = "run-as com.termux sh -c 'cat \"$TERMUX_CONFIG_PATH\"'"
+                    // 直接读取配置文件内容并检查
+                    val readConfigCommand = "run-as com.termux sh -c 'cat \"$TERMUX_CONFIG_PATH\" 2>/dev/null'"
                     val readConfigResult = AndroidShellExecutor.executeShellCommand(readConfigCommand)
 
-                    val configured =
-                            readConfigResult.success &&
-                                    readConfigResult.stdout.contains("allow-external-apps=true")
-                    updateCache(configured)
+                    val configured = readConfigResult.success && 
+                                     readConfigResult.stdout.contains("allow-external-apps=true")
+                                     && !readConfigResult.stdout.contains("# allow-external-apps")
                     return@withContext configured
                 }
-
-        /** 更新缓存 */
-        private fun updateCache(isConfigured: Boolean) {
-            val oldStatus =
-                    configCache.getAndSet(ConfigStatus(isConfigured, System.currentTimeMillis()))
-            if (oldStatus?.isConfigured != isConfigured) {
-                notifyStateChanged()
-            }
-        }
 
         /** 更新权限缓存 */
         private fun updatePermissionCache(
@@ -165,7 +125,6 @@ class TermuxAuthorizer {
 
         /** 重置缓存 */
         private fun resetCache() {
-            configCache.set(null)
             permissionCache.set(null)
             notifyStateChanged()
             TermuxInstaller.resetInstallCache()
@@ -174,10 +133,8 @@ class TermuxAuthorizer {
         /** 检查Termux是否已授权 */
         suspend fun isTermuxAuthorized(context: Context): Boolean =
                 withContext(Dispatchers.IO) {
-                    if (!TermuxInstaller.isTermuxInstalled(context) ||
-                                    !ShizukuAuthorizer.isShizukuServiceRunning() ||
-                                    !ShizukuAuthorizer.hasShizukuPermission()
-                    ) {
+                    // 基础条件检查
+                    if (!TermuxInstaller.isTermuxInstalled(context)) {
                         return@withContext false
                     }
 
@@ -187,8 +144,11 @@ class TermuxAuthorizer {
                     // 检查是否有Run Command权限
                     val hasRunCommandPermission = checkRunCommandPermission(context)
 
-                    // 两者都满足才算完全授权
-                    return@withContext configEnabled && hasRunCommandPermission
+                    // 三者都满足才算完全授权：Termux运行中、配置允许外部应用访问、有Run Command权限
+                    val authorized = configEnabled && hasRunCommandPermission
+                    Log.d(TAG, "Termux授权状态: 配置=$configEnabled, 权限=$hasRunCommandPermission")
+                    
+                    return@withContext authorized
                 }
 
         /** 授权Termux */
@@ -198,15 +158,6 @@ class TermuxAuthorizer {
                     if (!TermuxInstaller.isTermuxInstalled(context)) {
                         withContext(Dispatchers.Main) {
                             Toast.makeText(context, "请先安装Termux应用", Toast.LENGTH_SHORT).show()
-                        }
-                        return@withContext false
-                    }
-
-                    if (!ShizukuAuthorizer.isShizukuServiceRunning() ||
-                                    !ShizukuAuthorizer.hasShizukuPermission()
-                    ) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "请确保Shizuku已运行并授权", Toast.LENGTH_SHORT).show()
                         }
                         return@withContext false
                     }
@@ -394,26 +345,6 @@ class TermuxAuthorizer {
                         notifyStateChanged()
                         return@withContext true
                     }
-
-                    // 尝试方法2: 修改Termux的AndroidManifest.xml (需要root)
-                    val rootResult =
-                            AndroidShellExecutor.executeShellCommand(
-                                    "su -c 'mkdir -p /data/data/com.termux/shared_prefs && " +
-                                            "echo \"<?xml version=\\'1.0\\' encoding=\\'utf-8\\'?><map>" +
-                                            "<set name=\\\"allowed_apps\\\"><string>$packageName</string></set>" +
-                                            "</map>\" > /data/data/com.termux/shared_prefs/com.termux.shared_preferences.xml && " +
-                                            "chmod 660 /data/data/com.termux/shared_prefs/com.termux.shared_preferences.xml && " +
-                                            "chown `stat -c %u:%g /data/data/com.termux/shared_prefs` /data/data/com.termux/shared_prefs/com.termux.shared_preferences.xml'"
-                            )
-
-                    if (rootResult.success) {
-                        Log.d(TAG, "通过修改Termux首选项授予运行命令权限成功")
-                        // 重启Termux使配置生效
-                        AndroidShellExecutor.executeShellCommand("am force-stop com.termux")
-                        notifyStateChanged()
-                        return@withContext true
-                    }
-
                     // 尝试方法3: 在应用列表中添加
                     val appTermuxSuccess = grantAppTermuxPermissions(context)
                     if (appTermuxSuccess) {
@@ -454,16 +385,6 @@ class TermuxAuthorizer {
                     if (!TermuxInstaller.isTermuxInstalled(context)) {
                         withContext(Dispatchers.Main) {
                             Toast.makeText(context, "请先安装Termux应用", Toast.LENGTH_SHORT).show()
-                        }
-                        return@withContext false
-                    }
-
-                    // 检查Shizuku服务是否运行
-                    if (!ShizukuAuthorizer.isShizukuServiceRunning() ||
-                                    !ShizukuAuthorizer.hasShizukuPermission()
-                    ) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "请确保Shizuku已运行并授权", Toast.LENGTH_SHORT).show()
                         }
                         return@withContext false
                     }
@@ -620,13 +541,16 @@ class TermuxAuthorizer {
         /** 一键授予Termux全部所需权限 */
         suspend fun grantAllTermuxPermissions(context: Context): Boolean =
                 withContext(Dispatchers.IO) {
+                    // 允许外部调用
+                    var allowExternalApps = authorizeTermux(context)
+
                     // 授予运行命令权限
                     val runCmdResult = requestRunCommandPermission(context)
 
                     // 授予存储权限
                     val storageResult = requestStoragePermissions(context)
 
-                    val success = runCmdResult && storageResult
+                    val success = runCmdResult && storageResult && allowExternalApps
 
                     if (success) {
                         withContext(Dispatchers.Main) {
@@ -654,15 +578,6 @@ class TermuxAuthorizer {
                     if (!TermuxInstaller.isTermuxInstalled(context)) {
                         withContext(Dispatchers.Main) {
                             Toast.makeText(context, "请先安装Termux应用", Toast.LENGTH_SHORT).show()
-                        }
-                        return@withContext false
-                    }
-
-                    if (!ShizukuAuthorizer.isShizukuServiceRunning() ||
-                                    !ShizukuAuthorizer.hasShizukuPermission()
-                    ) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "请确保Shizuku已运行并授权", Toast.LENGTH_SHORT).show()
                         }
                         return@withContext false
                     }

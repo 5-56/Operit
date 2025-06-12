@@ -22,6 +22,7 @@ import com.ai.assistance.operit.ui.main.components.AppContent
 import com.ai.assistance.operit.ui.main.components.CollapsedDrawerContent
 import com.ai.assistance.operit.ui.main.components.DrawerContent
 import com.ai.assistance.operit.ui.main.screens.Screen
+import com.ai.assistance.operit.ui.main.screens.GestureStateHolder
 import kotlinx.coroutines.CoroutineScope
 
 /** Layout for tablet devices with a permanent side navigation drawer */
@@ -45,19 +46,19 @@ fun TabletLayout(
         onToggleSidebar: () -> Unit,
         navigateToTokenConfig: () -> Unit
 ) {
-        // 计算侧边栏的动画宽度
+        // 计算侧边栏的动画宽度，轻微调整动画时间为280ms，保持原有效果但稍快
         val animatedSidebarWidth by
                 animateDpAsState(
                         targetValue =
                                 if (isTabletSidebarExpanded) tabletSidebarWidth
                                 else collapsedTabletSidebarWidth,
-                        animationSpec = tween(durationMillis = 300),
+                        animationSpec = tween(durationMillis = 280),
                         label = "sidebarWidth"
                 )
 
         // 使用Box作为顶层容器，这样可以允许子元素重叠
         Box(modifier = Modifier.fillMaxSize()) {
-                // 计算主内容区域的宽度（屏幕宽度减去侧边栏宽度）
+                // 计算主内容区域的宽度（屏幕宽度减去侧边栏宽度），轻微调整动画时间
                 val contentWidth by
                         animateDpAsState(
                                 targetValue =
@@ -71,7 +72,7 @@ fun TabletLayout(
                                                         .current
                                                         .screenWidthDp
                                                         .dp - collapsedTabletSidebarWidth,
-                                animationSpec = tween(durationMillis = 300),
+                                animationSpec = tween(durationMillis = 280),
                                 label = "contentWidth"
                         )
 
@@ -91,7 +92,7 @@ fun TabletLayout(
                         shadowElevation = 4.dp,
                         color = MaterialTheme.colorScheme.surface
                 ) {
-                        // 根据展开状态显示不同内容
+                        // 根据展开状态显示不同内容，保持原有逻辑稳定性
                         if (isTabletSidebarExpanded) {
                                 DrawerContent(
                                         navItems = navItems,
@@ -119,7 +120,7 @@ fun TabletLayout(
                         }
                 }
 
-                // 主内容区域 - 使用width+offset替代之前的纯offset方式
+                // 主内容区域 - 使用width+offset方式，保留稳定的布局
                 Box(
                         modifier =
                                 Modifier.width(contentWidth)
@@ -140,11 +141,15 @@ fun TabletLayout(
                                 onScreenChange = onScreenChange,
                                 onNavItemChange = onNavItemChange,
                                 onToggleSidebar = onToggleSidebar,
-                                navigateToTokenConfig = navigateToTokenConfig
+                                navigateToTokenConfig = navigateToTokenConfig,
+                                onGestureConsumed = { consumed -> 
+                                    // 当聊天页面的手势被消费时，这里不需要特别处理
+                                    // 因为平板模式不像手机模式那样有侧滑抽屉
+                                }
                         )
                 }
 
-                // 添加一个小方块，填充圆角和工具栏之间的空隙（与手机模式一致）
+                // 添加一个小方块，填充圆角和工具栏之间的空隙
                 Box(
                         modifier =
                                 Modifier.width(16.dp)

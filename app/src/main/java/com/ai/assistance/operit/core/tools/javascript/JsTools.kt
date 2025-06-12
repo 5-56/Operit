@@ -40,8 +40,7 @@ fun getJsToolsDefinition(): String {
             Net: {
                 httpGet: (url) => toolCall("http_request", { url, method: "GET" }),
                 httpPost: (url, data) => toolCall("http_request", { url, method: "POST", data }),
-                search: (query) => toolCall("web_search", { query }),
-                fetchPage: (url) => toolCall("fetch_web_page", { url }),
+                visit: (url) => toolCall("visit_web", { url }),
                 // 新增增强版HTTP请求
                 http: (options) => toolCall("http_request", options),
                 // 新增文件上传
@@ -68,8 +67,7 @@ fun getJsToolsDefinition(): String {
                 // 获取设备位置
                 getLocation: (highAccuracy = false, timeout = 10) => 
                     toolCall("get_device_location", { high_accuracy: !!highAccuracy, timeout: parseInt(timeout) }),
-                shell: (command, timeoutMs) => toolCall("execute_shell", { command: command, timeout_ms: timeoutMs || 15000 
-                }),
+                shell: (command) => toolCall("execute_shell", { command: command }),
                 // 执行终端命令 - 一次性收集输出
                 terminal: (command, sessionId, timeoutMs) => {
                     const params = { command };

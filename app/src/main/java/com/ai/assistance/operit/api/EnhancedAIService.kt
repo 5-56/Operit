@@ -5,12 +5,14 @@ import android.util.Log
 import com.ai.assistance.operit.api.enhance.ConversationMarkupManager
 import com.ai.assistance.operit.api.enhance.ConversationRoundManager
 import com.ai.assistance.operit.api.enhance.InputProcessor
+import com.ai.assistance.operit.api.enhance.MultiServiceManager
 import com.ai.assistance.operit.api.enhance.ToolExecutionManager
 import com.ai.assistance.operit.api.library.ProblemLibrary
 import com.ai.assistance.operit.core.config.SystemPromptConfig
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
+import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.model.ToolExecutionProgress
@@ -41,18 +43,18 @@ import kotlinx.coroutines.withContext
  * Enhanced AI service that provides advanced conversational capabilities by integrating various
  * components like tool execution, conversation management, user preferences, and problem library.
  */
-class EnhancedAIService(
-        apiEndpoint: String,
-        apiKey: String,
-        modelName: String,
-        private val context: Context
-) {
+class EnhancedAIService(private val context: Context) {
     companion object {
         private const val TAG = "EnhancedAIService"
     }
 
-    // Use composition for the base AIService
-    private val aiService = AIService(apiEndpoint, apiKey, modelName)
+    // MultiServiceManager 管理不同功能的 AIService 实例
+    private val multiServiceManager = MultiServiceManager(context)
+
+    // AIService 实例 - 保留为兼容现有代码，但实际使用 MultiServiceManager
+    private val aiService: AIService by lazy {
+        runBlocking { multiServiceManager.getDefaultService() }
+    }
 
     // Tool handler for executing tools
     private val toolHandler = AIToolHandler.getInstance(context)
@@ -60,6 +62,8 @@ class EnhancedAIService(
     // 初始化问题库
     init {
         ProblemLibrary.initialize(context)
+        // 初始化 MultiServiceManager
+        runBlocking { multiServiceManager.initialize() }
     }
 
     // State flows for UI updates
@@ -92,8 +96,33 @@ class EnhancedAIService(
     // Package manager for handling tool packages
     private val packageManager = PackageManager.getInstance(context, toolHandler)
 
+    // Current chat ID for web workspace
+    private var currentChatId: String? = null
+
     init {
         toolHandler.registerDefaultTools()
+    }
+
+    /**
+     * 获取指定功能类型的 AIService 实例
+     * @param functionType 功能类型
+     * @return AIService 实例
+     */
+    suspend fun getAIServiceForFunction(functionType: FunctionType): AIService {
+        return multiServiceManager.getServiceForFunction(functionType)
+    }
+
+    /**
+     * 刷新指定功能类型的 AIService 实例 当配置发生更改时调用
+     * @param functionType 功能类型
+     */
+    suspend fun refreshServiceForFunction(functionType: FunctionType) {
+        multiServiceManager.refreshServiceForFunction(functionType)
+    }
+
+    /** 刷新所有 AIService 实例 当全局配置发生更改时调用 */
+    suspend fun refreshAllServices() {
+        multiServiceManager.refreshAllServices()
     }
 
     /** Get the tool progress flow for UI updates */
@@ -216,9 +245,14 @@ class EnhancedAIService(
             message: String,
             onPartialResponse: (content: String, thinking: String?) -> Unit,
             chatHistory: List<Pair<String, String>> = emptyList(),
-            onComplete: () -> Unit = {}
+            onComplete: () -> Unit = {},
+            chatId: String? = null,
+            functionType: FunctionType = FunctionType.CHAT // 新增参数，默认为CHAT类型
     ) {
         try {
+            // Store the chat ID for web workspace
+            currentChatId = chatId
+
             // Mark conversation as active
             isConversationActive.set(true)
 
@@ -239,7 +273,10 @@ class EnhancedAIService(
             _inputProcessingState.value =
                     InputProcessingState.Connecting("Connecting to AI service...")
 
-            Log.d(TAG, "Sending message to AI service with ${preparedHistory.size} history items")
+            Log.d(
+                    TAG,
+                    "Sending message to AI service with ${preparedHistory.size} history items for function: $functionType"
+            )
 
             // Get all model parameters from preferences (with enabled state)
             val modelParameters = runBlocking { apiPreferences.getAllModelParameters() }
@@ -248,8 +285,11 @@ class EnhancedAIService(
                     "Retrieved ${modelParameters.size} model parameters, enabled: ${modelParameters.count { it.isEnabled }}"
             )
 
+            // 获取对应功能类型的AIService实例
+            val serviceForFunction = multiServiceManager.getServiceForFunction(functionType)
+
             withContext(Dispatchers.IO) {
-                aiService.sendMessage(
+                serviceForFunction.sendMessage(
                         message = processedInput,
                         onPartialResponse = { content, thinking ->
                             // First response received, update to receiving state
@@ -267,7 +307,7 @@ class EnhancedAIService(
                             )
                         },
                         chatHistory = preparedHistory,
-                        onComplete = { handleStreamingComplete(onComplete) },
+                        onComplete = { handleStreamingComplete(onComplete, functionType) },
                         onConnectionStatus = { status ->
                             // Update connection status in UI
                             when {
@@ -314,7 +354,8 @@ class EnhancedAIService(
                 val customIntroPrompt = apiPreferences.customIntroPromptFlow.first()
                 val customTonePrompt = apiPreferences.customTonePromptFlow.first()
 
-                val systemPrompt =
+                // 获取系统提示词，并替换{CHAT_ID}为当前聊天ID
+                var systemPrompt =
                         if (customIntroPrompt.isNotEmpty() || customTonePrompt.isNotEmpty()) {
                             // Use custom prompts if they are set
                             SystemPromptConfig.getSystemPromptWithCustomPrompts(
@@ -327,6 +368,14 @@ class EnhancedAIService(
                             // Use default system prompt
                             SystemPromptConfig.getSystemPrompt(packageManager, planningEnabled)
                         }
+
+                // 替换{CHAT_ID}为当前聊天ID
+                if (currentChatId != null) {
+                    systemPrompt = systemPrompt.replace("{CHAT_ID}", currentChatId!!)
+                } else {
+                    // 如果没有聊天ID，使用一个默认值
+                    systemPrompt = systemPrompt.replace("{CHAT_ID}", "default")
+                }
 
                 if (preferencesText.isNotEmpty()) {
                     conversationHistory.add(
@@ -626,7 +675,10 @@ class EnhancedAIService(
     }
 
     /** Handle the completion of streaming response */
-    private fun handleStreamingComplete(onComplete: () -> Unit) {
+    private fun handleStreamingComplete(
+            onComplete: () -> Unit,
+            functionType: FunctionType = FunctionType.CHAT
+    ) {
         toolProcessingScope.launch {
             try {
                 // If conversation is no longer active, return immediately
@@ -714,7 +766,8 @@ class EnhancedAIService(
                             toolInvocations,
                             displayContent,
                             responseCallback,
-                            onComplete
+                            onComplete,
+                            functionType
                     )
                     return@launch
                 }
@@ -746,7 +799,8 @@ class EnhancedAIService(
             toolInvocations: List<ToolInvocation>,
             displayContent: String,
             responseCallback: (content: String, thinking: String?) -> Unit,
-            onComplete: () -> Unit
+            onComplete: () -> Unit,
+            functionType: FunctionType = FunctionType.CHAT
     ) {
         Log.d(TAG, "Found tool invocation in completed content, starting processing")
 
@@ -837,7 +891,7 @@ class EnhancedAIService(
 
                 // Process error result and exit
                 if (errorResult != null) {
-                    processToolResult(errorResult, onComplete)
+                    processToolResult(errorResult, onComplete, functionType)
                 }
                 return
             }
@@ -860,7 +914,7 @@ class EnhancedAIService(
         }
 
         // Process the tool result
-        processToolResult(result, onComplete)
+        processToolResult(result, onComplete, functionType)
     }
 
     /** Handle task completion logic */
@@ -898,7 +952,7 @@ class EnhancedAIService(
                         toolHandler,
                         conversationHistory,
                         displayContent,
-                        aiService
+                        multiServiceManager.getServiceForFunction(FunctionType.PROBLEM_LIBRARY)
                 )
             }
         }
@@ -950,7 +1004,11 @@ class EnhancedAIService(
     }
 
     /** Process tool execution result and continue conversation */
-    private suspend fun processToolResult(result: ToolResult, onComplete: () -> Unit) {
+    private suspend fun processToolResult(
+            result: ToolResult,
+            onComplete: () -> Unit,
+            functionType: FunctionType = FunctionType.CHAT
+    ) {
         // Add transition state
         _inputProcessingState.value =
                 InputProcessingState.Processing(
@@ -998,9 +1056,12 @@ class EnhancedAIService(
                 "Retrieved ${modelParameters.size} model parameters for tool response, enabled: ${modelParameters.count { it.isEnabled }}"
         )
 
+        // 获取对应功能类型的AIService实例
+        val serviceForFunction = multiServiceManager.getServiceForFunction(functionType)
+
         // Direct request AI response in current flow, keeping in complete main loop
         withContext(Dispatchers.IO) {
-            aiService.sendMessage(
+            serviceForFunction.sendMessage(
                     message = toolResultMessage,
                     onPartialResponse = { content, thinking ->
                         // Only handle display, not any tool logic
@@ -1017,11 +1078,14 @@ class EnhancedAIService(
                     },
                     chatHistory = currentChatHistory,
                     onComplete = {
-                        handleStreamingComplete {
-                            if (!isConversationActive.get()) {
-                                currentCompleteCallback?.invoke()
-                            }
-                        }
+                        handleStreamingComplete(
+                                {
+                                    if (!isConversationActive.get()) {
+                                        currentCompleteCallback?.invoke()
+                                    }
+                                },
+                                functionType
+                        )
                     },
                     onConnectionStatus = { status ->
                         // Update connection status for post-tool execution request
@@ -1070,6 +1134,28 @@ class EnhancedAIService(
     /** Reset token counters to zero Use this when starting a new conversation */
     fun resetTokenCounters() {
         aiService.resetTokenCounts()
+    }
+
+    /**
+     * 重置指定功能类型或所有功能类型的token计数器
+     * @param functionType 功能类型，如果为null则重置所有功能类型
+     */
+    suspend fun resetTokenCountersForFunction(functionType: FunctionType? = null) {
+        if (functionType == null) {
+            // 重置所有服务实例的token计数
+            FunctionType.values().forEach { type ->
+                try {
+                    val service = multiServiceManager.getServiceForFunction(type)
+                    service.resetTokenCounts()
+                } catch (e: Exception) {
+                    Log.e(TAG, "重置${type}功能的token计数失败", e)
+                }
+            }
+        } else {
+            // 只重置指定功能类型的token计数
+            val service = multiServiceManager.getServiceForFunction(functionType)
+            service.resetTokenCounts()
+        }
     }
 
     /**
@@ -1177,10 +1263,13 @@ class EnhancedAIService(
             // Get all model parameters from preferences (with enabled state)
             val modelParameters = runBlocking { apiPreferences.getAllModelParameters() }
 
-            // 使用aiService发送直接请求
+            // 获取SUMMARY功能类型的AIService实例
+            val summaryService = multiServiceManager.getServiceForFunction(FunctionType.SUMMARY)
+
+            // 使用summaryService发送直接请求
             var summaryContent = ""
 
-            aiService.sendMessage(
+            summaryService.sendMessage(
                     message = "请按照要求总结对话内容",
                     onPartialResponse = { content, _ -> summaryContent = content },
                     chatHistory = finalMessages,
@@ -1195,8 +1284,8 @@ class EnhancedAIService(
             }
 
             // 获取本次总结生成的token统计
-            val inputTokens = aiService.inputTokenCount
-            val outputTokens = aiService.outputTokenCount
+            val inputTokens = summaryService.inputTokenCount
+            val outputTokens = summaryService.outputTokenCount
 
             // 将总结token计数添加到用户偏好分析的token统计中
             try {
@@ -1212,5 +1301,23 @@ class EnhancedAIService(
             Log.e(TAG, "生成总结时出错", e)
             return "对话摘要：生成摘要时出错，但对话仍在继续。"
         }
+    }
+
+    /**
+     * 获取指定功能类型的当前输入token计数
+     * @param functionType 功能类型
+     * @return 输入token计数
+     */
+    suspend fun getCurrentInputTokenCountForFunction(functionType: FunctionType): Int {
+        return multiServiceManager.getServiceForFunction(functionType).inputTokenCount
+    }
+
+    /**
+     * 获取指定功能类型的当前输出token计数
+     * @param functionType 功能类型
+     * @return 输出token计数
+     */
+    suspend fun getCurrentOutputTokenCountForFunction(functionType: FunctionType): Int {
+        return multiServiceManager.getServiceForFunction(functionType).outputTokenCount
     }
 }

@@ -25,6 +25,23 @@
     <string name="toolbox">工具箱</string>
     <string name="mcp">MCP</string>
     <string name="token_config_title">DeepSeek Token配置</string>
+    <string name="chat_history_settings">聊天记录管理</string>
+    
+    <!-- 聊天记录管理界面 -->
+    <string name="chat_history_manager">聊天记录管理</string>
+    <string name="export_chat_history">导出聊天记录</string>
+    <string name="import_chat_history">导入聊天记录</string>
+    <string name="clear_chat_history">清除所有聊天记录</string>
+    <string name="confirm_delete">确认删除</string>
+    <string name="delete_warning">删除所有聊天记录将无法恢复。建议在执行此操作前先导出备份。</string>
+    <string name="export_success">导出成功</string>
+    <string name="import_success">导入成功</string>
+    <string name="operation_failed">操作失败</string>
+    <string name="danger_zone">危险区域</string>
+    <string name="chat_statistics">聊天记录统计</string>
+    <string name="current_chats">当前共有 %1$d 条聊天记录</string>
+    <string name="backup_location">备份文件保存在「下载/Operit」文件夹中</string>
+    <string name="faq_backup">常见问题</string>
     
     <!-- Terminal Screen -->
     <string name="termux_not_installed">Termux 未安装</string>
@@ -48,7 +65,7 @@
     <string name="about_version">版本: %1$s</string>
     <string name="about_description">Operit AI是一个智能助手应用，能够帮助用户更高效地使用设备，提供界面分析、聊天对话等功能。</string>
     <string name="about_developer">开发者: &lt;a href="https://github.com/AAswordman"&gt;AAswordman&lt;/a&gt;</string>
-    <string name="about_contact">联系我们: support@operit.ai</string>
+    <string name="about_contact">联系我们: aaswordsman@foxmail.com</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
     <string name="about_copyright">© 2023-2024 Operit. 保留所有权利。</string>
     
@@ -217,4 +234,66 @@
     <string name="problem_time">创建时间</string>
     <string name="save_changes">保存更改</string>
     <string name="back_to_list">返回列表</string>
+    
+    <!-- Language Settings -->
+    <string name="language_settings">语言设置</string>
+    <string name="language_settings_desc">更改应用界面显示语言</string>
+    <string name="change_language">更改语言</string>
+    <string name="select_language">选择语言</string>
+    <string name="language_info">更改语言后，应用将自动重启以应用新的语言设置</string>
+    <string name="language_changing">正在切换语言...</string>
+    <string name="language_changed">语言已更改，正在重启应用</string>
+    
+    <!-- 用户协议界面 -->
+    <string name="agreement_title">用户协议及隐私政策</string>
+    <string name="agreement_subtitle">请在使用我们的应用前，仔细阅读以下协议</string>
+    <string name="agreement_user_title">用户协议</string>
+    <string name="agreement_privacy_title">隐私政策</string>
+    <string name="agreement_accept">我已阅读并同意以上协议</string>
+    <string name="agreement_wait">请先阅读协议 (%1$d)</string>
+    
+    <string name="agreement_user_content">感谢您选择使用我们的应用！在开始使用前，请务必仔细阅读以下重要声明：\n\n1. 免责声明\n   本软件具有强大的功能，可能存在潜在破坏力。用户使用本软件进行的任何操作及其后果，均与开发者无关，我们不承担任何责任。\n\n2. 官方下载渠道\n   为确保您的安全，请务必从我们的官方GitHub仓库下载本软件。从其他渠道下载可能存在安全风险，我们不对此负责。\n\n3. 开源协议\n   本软件是开源项目，遵循GPL（GNU通用公共许可证）协议。用户可以自由使用、修改和分发本软件，但必须遵守GPL协议的相关条款。\n\n4. 第三方使用\n   我们不对第三方如何使用、修改或分发本软件负责。任何基于本软件的衍生作品或相关行为与原开发者无关。\n\n5. 用户行为\n   用户应自行承担使用本软件的全部风险和法律责任。请确保您的使用行为符合当地法律法规。\n\n6. 终止条款\n   我们保留在用户违反协议时终止其使用权的权利。\n\n7. 无保证声明\n   本软件按"现状"提供，不提供任何形式的保证，包括但不限于适用性、可靠性或准确性。\n\n8. 责任限制\n   在法律允许的最大范围内，我们不对因使用本软件造成的任何直接或间接损失负责。\n\n9. 协议修改\n   我们可能会不时修改本协议，修改后的协议将在发布时生效。\n\n10. 适用法律\n    本协议受中华人民共和国法律管辖。</string>
+    
+    <string name="agreement_privacy_content">关于您的隐私，请了解以下重要信息：\n\n1. 无数据收集\n   我们不会主动收集您的任何个人信息或使用数据。本应用的设计理念是尊重用户隐私，不进行任何形式的数据收集。\n\n2. 本地处理\n   所有数据处理均在您的设备本地完成，不会上传到我们的服务器或任何第三方服务器。因此，您的隐私数据安全完全由您自己控制。\n\n3. 第三方服务\n   如果本应用集成了任何第三方服务或库，其数据处理行为不在我们的控制范围内。请参阅相关第三方的隐私政策。\n\n4. 权限说明\n   本应用可能需要某些系统权限才能正常运行。这些权限仅用于应用功能实现，不会用于收集您的个人信息。\n\n5. 开源透明\n   作为一个开源项目，我们的代码对所有人公开透明。您可以在GitHub上查看源代码，验证我们的隐私声明。\n\n6. 无责任声明\n   由于我们不收集、不存储用户数据，因此对于用户数据泄露、丢失或被盗用的情况不承担责任。\n\n7. 政策更新\n   我们可能会更新本隐私政策，更新后的政策将在GitHub发布并在应用中更新。\n\n8. 联系我们\n   如果您对隐私政策有任何疑问，请通过GitHub项目页面联系我们。</string>
+    
+    <!-- File Manager -->
+    <string name="files_selected">已选择 %1$d 个文件</string>
+    <string name="file_count">%1$d 个项目</string>
+    <string name="exit_multi_select">退出多选模式</string>
+    
+    <!-- Search Dialog -->
+    <string name="search_files">搜索文件</string>
+    <string name="searching">正在搜索...</string>
+    <string name="case_sensitive">区分大小写</string>
+    <string name="use_wildcard">使用通配符</string>
+    <string name="search">搜索</string>
+    
+    <!-- File Operations -->
+    <string name="new_folder">新建文件夹</string>
+    <string name="folder_name">文件夹名称</string>
+    <string name="create_folder">创建文件夹</string>
+    <string name="open">打开</string>
+    <string name="copy">复制</string>
+    <string name="cut">剪切</string>
+    <string name="paste">粘贴</string>
+    <string name="share">分享</string>
+    <string name="rename">重命名</string>
+    <string name="delete">删除</string>
+    <string name="loading_files">正在加载文件...</string>
+
+    <!-- ErrorDialog -->
+    <string name="request_failed">请求失败</string>
+    <string name="confirm">确定</string>
+    <string name="unknown_error">未知错误</string>
+    <string name="server_connection_failed">无法连接到服务器，请检查网络连接</string>
+    <string name="connection_timeout">连接服务器超时，请检查网络或稍后再试</string>
+    <string name="connection_refused">服务器拒绝连接，请稍后再试</string>
+    <string name="connection_check_network">连接超时，请检查网络</string>
+    <string name="cannot_resolve_host">无法解析服务器地址，请检查网络连接</string>
+    <string name="cannot_connect_to_server">无法连接到服务器</string>
+    <string name="secure_connection_failed">安全连接失败</string>
+    <string name="request_timeout">请求超时，请稍后重试</string>
+    <string name="network_transfer_failed">网络传输失败，请检查网络连接</string>
+    <string name="error_occurred">发生错误: %1$s</string>
+    <string name="try_again_later">请求失败，请稍后再试</string>
 </resources>

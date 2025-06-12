@@ -13,19 +13,14 @@ android {
         applicationId = "com.ai.assistance.operit"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.2"
+        versionCode = 6
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
         
-        // Filter to only include x86_64 and arm64-v8a architectures
-        // ndk {
-        //     abiFilters.add("x86_64")
-        //     abiFilters.add("arm64-v8a")
-        // }
     }
 
     buildTypes {
@@ -85,10 +80,32 @@ android {
         }
     }
 }
+
 dependencies {
     implementation(libs.androidx.ui.graphics.android)
+    implementation(files("libs\\ffmpegkit.jar"))
+    implementation(files("libs\\arsc.jar"))
     // Desugaring support for modern Java APIs on older Android
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    
+    // APK解析和修改库
+    implementation("com.android.tools.build:apksig:8.1.0") // APK签名工具
+    implementation("net.dongliu:apk-parser:2.6.10") // 用于解析和处理AndroidManifest.xml
+    implementation("com.github.Sable:axml:2.0.0") // 用于Android二进制XML的读写
+    implementation("com.github.iyxan23:zipalign-java:1.2.1") // 用于处理ZIP文件对齐
+    
+    // ZIP处理库 - 用于APK解压和重打包
+    implementation("org.apache.commons:commons-compress:1.25.0")
+    implementation("commons-io:commons-io:2.13.0") // 添加Apache Commons IO
+    
+    // 图片处理库
+    implementation("com.github.bumptech.glide:glide:4.16.0") // 用于处理图像
+    
+    // XML处理
+    implementation("androidx.core:core-ktx:1.12.0")
+    
+    // libsu - root access library
+    implementation("com.github.topjohnwu.libsu:core:6.0.0")
     
     // Add missing SVG support
     implementation("com.caverock:androidsvg-aar:1.4")
@@ -183,16 +200,20 @@ dependencies {
     // 用于向量嵌入的TF Lite (如果需要自定义嵌入)
     implementation("org.tensorflow:tensorflow-lite:2.8.0")
 
+    // BouncyCastle加密库 - 用于PKCS12密钥处理
+    implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
+    implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+
     // Room 数据库
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1") // Kotlin扩展和协程支持
     kapt("androidx.room:room-compiler:2.6.1") // 使用kapt代替ksp
 
     // FFmpeg dependency with specific architectures
-    implementation("com.arthenica:ffmpeg-kit-full:6.0-2") {
+    // implementation("com.arthenica:ffmpeg-kit-full:6.0-2") {
         // exclude(group = "com.arthenica", module = "ffmpeg-kit-android-lib-armeabi-v7a")
         // exclude(group = "com.arthenica", module = "ffmpeg-kit-android-lib-x86")
-    }
+    // }
 
     // Archive/compression libraries
     implementation("org.apache.commons:commons-compress:1.24.0")
@@ -247,4 +268,27 @@ dependencies {
 
     // Color picker for theme customization
     implementation("com.github.skydoves:colorpicker-compose:1.0.6")
+    
+    // NanoHTTPD for local web server
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+
+    // 添加测试依赖
+    testImplementation(libs.junit)
+    
+    // Android测试依赖
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
+    
+    // 协程测试依赖
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    
+    // 模拟测试框架
+    testImplementation("org.mockito:mockito-core:5.2.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+    androidTestImplementation("org.mockito:mockito-android:5.2.0")
 }

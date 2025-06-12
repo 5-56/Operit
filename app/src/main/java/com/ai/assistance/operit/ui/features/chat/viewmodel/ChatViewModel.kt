@@ -11,11 +11,19 @@ import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.model.ToolExecutionProgress
+import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.ui.features.chat.attachments.AttachmentManager
+import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.permissions.PermissionLevel
 import com.ai.assistance.operit.ui.permissions.ToolPermissionSystem
+import java.io.IOException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -76,8 +84,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     // Use lazy initialization for exposed properties to avoid circular reference issues
     // API配置相关
     val apiKey: StateFlow<String> by lazy { apiConfigDelegate.apiKey }
-    val apiEndpoint: StateFlow<String> by lazy { apiConfigDelegate.apiEndpoint }
-    val modelName: StateFlow<String> by lazy { apiConfigDelegate.modelName }
     val isConfigured: StateFlow<Boolean> by lazy { apiConfigDelegate.isConfigured }
     val showThinking: StateFlow<Boolean> by lazy { apiConfigDelegate.showThinking }
     val enableAiPlanning: StateFlow<Boolean> by lazy { apiConfigDelegate.enableAiPlanning }
@@ -123,6 +129,18 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 附件相关
     val attachments: StateFlow<List<AttachmentInfo>> by lazy { attachmentManager.attachments }
+
+    // 添加一个用于跟踪附件面板状态的变量
+    private val _attachmentPanelState = MutableStateFlow(false)
+    val attachmentPanelState: StateFlow<Boolean> = _attachmentPanelState
+
+    // 添加WebView显示状态的状态流
+    private val _showWebView = MutableStateFlow(false)
+    val showWebView: StateFlow<Boolean> = _showWebView
+
+    // 添加WebView刷新控制流
+    private val _webViewNeedsRefresh = MutableStateFlow(false)
+    val webViewNeedsRefresh: StateFlow<Boolean> = _webViewNeedsRefresh
 
     init {
         // Initialize delegates in correct order to avoid circular references
@@ -191,6 +209,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                             // 更新用户消息
                             messageProcessingDelegate.updateUserMessage(message)
                             // 发送消息时也要传递附件
+                            // 直接调用sendUserMessage方法，它会检查并创建新对话
                             sendUserMessage()
                         },
                         onAttachmentRequested = { request -> processAttachmentRequest(request) },
@@ -325,8 +344,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // API配置相关方法
     fun updateApiKey(key: String) = apiConfigDelegate.updateApiKey(key)
-    fun updateApiEndpoint(endpoint: String) = apiConfigDelegate.updateApiEndpoint(endpoint)
-    fun updateModelName(model: String) = apiConfigDelegate.updateModelName(model)
     fun saveApiSettings() = apiConfigDelegate.saveApiSettings()
     fun useDefaultConfig() {
         if (apiConfigDelegate.useDefaultConfig()) {
@@ -353,7 +370,21 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun createNewChat() {
         chatHistoryDelegate.createNewChat()
     }
-    fun switchChat(chatId: String) = chatHistoryDelegate.switchChat(chatId)
+
+    fun switchChat(chatId: String) {
+        chatHistoryDelegate.switchChat(chatId)
+
+        // 如果当前WebView正在显示，则更新工作区并触发刷新
+        if (_showWebView.value) {
+            updateWebServerForCurrentChat(chatId)
+            // 延迟一点时间再触发刷新，等待服务器工作区更新完成
+            viewModelScope.launch {
+                delay(200) // 延迟200毫秒
+                refreshWebView()
+            }
+        }
+    }
+
     fun deleteChatHistory(chatId: String) = chatHistoryDelegate.deleteChatHistory(chatId)
     fun clearCurrentChat() {
         chatHistoryDelegate.clearCurrentChat()
@@ -465,11 +496,52 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun updateUserMessage(message: String) = messageProcessingDelegate.updateUserMessage(message)
 
     fun sendUserMessage() {
+        // 检查是否有当前对话，如果没有则创建一个新对话
+        if (currentChatId.value == null) {
+            Log.d(TAG, "当前没有活跃对话，自动创建新对话")
+
+            // 使用viewModelScope启动协程
+            viewModelScope.launch {
+                // 使用现有的createNewChat方法创建新对话
+                chatHistoryDelegate.createNewChat()
+
+                // 等待对话ID更新
+                var waitCount = 0
+                while (currentChatId.value == null && waitCount < 10) {
+                    delay(100) // 短暂延迟等待对话创建完成
+                    waitCount++
+                }
+
+                if (currentChatId.value == null) {
+                    Log.e(TAG, "创建新对话超时，无法发送消息")
+                    uiStateDelegate.showErrorMessage("无法创建新对话，请重试")
+                    return@launch
+                }
+
+                Log.d(TAG, "新对话创建完成，ID: ${currentChatId.value}，现在发送消息")
+
+                // 对话创建完成后，发送消息
+                sendMessageInternal()
+            }
+        } else {
+            // 已有对话，直接发送消息
+            sendMessageInternal()
+        }
+    }
+
+    // 提取内部发送消息的逻辑为一个私有方法
+    private fun sendMessageInternal() {
+        // 获取当前聊天ID
+        val chatId = currentChatId.value
+
+        // 更新本地Web服务器的聊天ID
+        chatId?.let { updateWebServerForCurrentChat(it) }
+
         // 获取当前附件列表
         val currentAttachments = attachmentManager.attachments.value
 
         // 调用messageProcessingDelegate发送消息，并传递附件信息
-        messageProcessingDelegate.sendUserMessage(currentAttachments)
+        messageProcessingDelegate.sendUserMessage(currentAttachments, chatId)
 
         // 发送后清空附件列表
         if (currentAttachments.isNotEmpty()) {
@@ -477,6 +549,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             // 更新悬浮窗附件列表
             updateFloatingWindowAttachments()
         }
+
+        // 重置附件面板状态 - 在发送消息后关闭附件面板
+        resetAttachmentPanelState()
     }
 
     fun cancelCurrentMessage() {
@@ -762,9 +837,125 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    /** 重置附件面板状态 - 在发送消息后关闭附件面板 */
+    fun resetAttachmentPanelState() {
+        _attachmentPanelState.value = false
+    }
+
+    /** 更新附件面板状态 */
+    fun updateAttachmentPanelState(newState: Boolean) {
+        _attachmentPanelState.value = newState
+    }
+
+    // WebView控制方法
+    fun toggleWebView() {
+        // 如果要显示WebView，确保本地Web服务器已启动
+        if (!_showWebView.value) {
+            // 获取当前聊天ID
+            val chatId = currentChatId.value
+            if (chatId != null) {
+                // 更新Web服务器工作区
+                updateWebServerForCurrentChat(chatId)
+            } else {
+                // 如果没有聊天ID，先创建一个新对话
+                viewModelScope.launch {
+                    createNewChat()
+
+                    // 等待聊天ID创建完成
+                    var waitCount = 0
+                    while (currentChatId.value == null && waitCount < 10) {
+                        delay(100)
+                        waitCount++
+                    }
+
+                    // 使用新创建的聊天ID更新Web服务器
+                    currentChatId.value?.let { newChatId ->
+                        updateWebServerForCurrentChat(newChatId)
+                    }
+                }
+            }
+        }
+
+        // 切换WebView显示状态
+        _showWebView.value = !_showWebView.value
+    }
+
+    // 初始化本地Web服务器
+    private fun initLocalWebServer() {
+        try {
+            // 使用单例模式获取LocalWebServer实例
+            val webServer = LocalWebServer.getInstance(context)
+            // 只有当服务器未运行时才启动
+            if (!webServer.isRunning()) {
+                webServer.start()
+                Log.d(TAG, "本地Web服务器已启动")
+            } else {
+                Log.d(TAG, "本地Web服务器已经在运行中")
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "初始化本地Web服务器失败", e)
+            uiStateDelegate.showErrorMessage("无法启动Web服务器: ${e.message}")
+        }
+    }
+
+    // 更新当前聊天ID的Web服务器工作空间
+    fun updateWebServerForCurrentChat(chatId: String) {
+        try {
+            // 使用单例模式获取LocalWebServer实例
+            val webServer = LocalWebServer.getInstance(context)
+            // 确保服务器已启动
+            if (!webServer.isRunning()) {
+                webServer.start()
+            }
+            webServer.updateChatId(chatId)
+            Log.d(TAG, "Web服务器工作空间已更新为: $chatId")
+        } catch (e: Exception) {
+            Log.e(TAG, "更新Web服务器工作空间失败", e)
+            uiStateDelegate.showErrorMessage("更新Web工作空间失败: ${e.message}")
+        }
+    }
+
+    // 重置WebView刷新状态
+    fun resetWebViewRefreshState() {
+        _webViewNeedsRefresh.value = false
+    }
+
+    // 强制WebView刷新
+    fun refreshWebView() {
+        _webViewNeedsRefresh.value = true
+    }
+
+    // 判断是否正在使用默认API配置
+    fun isUsingDefaultConfig(): Boolean {
+        // 初始化ModelConfigManager以检查所有配置
+        val modelConfigManager = ModelConfigManager(context)
+        var hasDefaultKey = false
+
+        // 使用runBlocking因为我们需要从flow中收集数据
+        runBlocking {
+            // 获取所有配置ID
+            val configIds = modelConfigManager.configListFlow.first()
+
+            // 检查每个配置是否使用默认API key
+            for (id in configIds) {
+                val config = modelConfigManager.getModelConfigFlow(id).first()
+                if (config.apiKey == ApiPreferences.DEFAULT_API_KEY) {
+                    hasDefaultKey = true
+                    break
+                }
+            }
+        }
+
+        return hasDefaultKey
+    }
+
     override fun onCleared() {
         super.onCleared()
         // 清理悬浮窗资源
         floatingWindowDelegate.cleanup()
+
+        // 不再在这里停止Web服务器，因为使用的是单例模式
+        // 服务器应在应用退出时由Application类或专门的服务管理类关闭
+        // 这样可以在界面切换时保持服务器的连续运行
     }
 }
