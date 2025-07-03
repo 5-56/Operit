@@ -88,12 +88,6 @@ open class StandardShellToolExecutor(private val context: Context) {
             command.isNullOrBlank() -> {
                 ToolValidationResult(valid = false, errorMessage = "Command parameter is required")
             }
-            command.contains("rm -rf") || command.contains("format") -> {
-                ToolValidationResult(
-                        valid = false,
-                        errorMessage = "Potentially dangerous command detected"
-                )
-            }
             else -> {
                 // Check if Shizuku service is available
                 if (!ShizukuAuthorizer.isShizukuServiceRunning()) {

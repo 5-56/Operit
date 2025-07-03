@@ -2,6 +2,7 @@ package com.ai.assistance.operit.core.tools
 
 import android.content.Context
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
+import com.ai.assistance.operit.core.workflow.WorkflowToolRegistration
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.ui.permissions.ToolCategory
 import org.json.JSONArray
@@ -17,6 +18,12 @@ import org.json.JSONArray
  * @param context Application context for tools that need it
  */
 fun registerAllTools(handler: AIToolHandler, context: Context) {
+    
+    // ================================
+    // 注册智能工作流工具 - NEW!
+    // ================================
+    WorkflowToolRegistration.registerWorkflowTools(handler, context)
+    
     // 不在提示词加入的工具
     handler.registerTool(
             name = "execute_shell",
@@ -255,29 +262,26 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             dangerCheck = { tool ->
                 val resourceId = tool.parameters.find { it.name == "resourceId" }?.value ?: ""
                 val className = tool.parameters.find { it.name == "className" }?.value ?: ""
-                val dangerousWords =
-                        listOf(
-                                "send",
-                                "submit",
-                                "confirm",
-                                "pay",
-                                "purchase",
-                                "buy",
-                                "delete",
-                                "remove",
-                                "发送",
-                                "提交",
-                                "确认",
-                                "支付",
-                                "购买",
-                                "删除",
-                                "移除"
-                        )
-
-                dangerousWords.any { word ->
+                val text = tool.parameters.find { it.name == "text" }?.value ?: ""
+                
+                // 只检查支付密码相关的危险操作
+                val paymentWords = listOf("pay", "payment", "支付", "银行", "bank", "financial", "财务")
+                val passwordWords = listOf("password", "passwd", "密码", "pin")
+                
+                val containsPayment = paymentWords.any { word ->
                     resourceId.contains(word, ignoreCase = true) ||
-                            className.contains(word, ignoreCase = true)
+                    className.contains(word, ignoreCase = true) ||
+                    text.contains(word, ignoreCase = true)
                 }
+                
+                val containsPassword = passwordWords.any { word ->
+                    resourceId.contains(word, ignoreCase = true) ||
+                    className.contains(word, ignoreCase = true) ||
+                    text.contains(word, ignoreCase = true)
+                }
+                
+                // 只有同时包含支付和密码相关词汇才认为危险
+                containsPayment && containsPassword
             },
             descriptionGenerator = { tool ->
                 val resourceId = tool.parameters.find { it.name == "resourceId" }?.value
@@ -383,7 +387,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "move_file",
             category = ToolCategory.FILE_WRITE,
-            dangerCheck = { true },
             descriptionGenerator = { tool ->
                 val source = tool.parameters.find { it.name == "source" }?.value ?: ""
                 val destination = tool.parameters.find { it.name == "destination" }?.value ?: ""
@@ -513,7 +516,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "modify_system_setting",
             category = ToolCategory.SYSTEM_OPERATION,
-            dangerCheck = { true },
             descriptionGenerator = { tool ->
                 val key = tool.parameters.find { it.name == "key" }?.value ?: ""
                 val value = tool.parameters.find { it.name == "value" }?.value ?: ""
@@ -541,7 +543,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "install_app",
             category = ToolCategory.SYSTEM_OPERATION,
-            dangerCheck = { true },
             descriptionGenerator = { tool ->
                 val path = tool.parameters.find { it.name == "path" }?.value ?: ""
                 "安装应用: $path"
@@ -555,7 +556,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "uninstall_app",
             category = ToolCategory.SYSTEM_OPERATION,
-            dangerCheck = { true },
             descriptionGenerator = { tool ->
                 val packageName = tool.parameters.find { it.name == "package_name" }?.value ?: ""
                 "卸载应用: $packageName"
@@ -592,7 +592,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "stop_app",
             category = ToolCategory.SYSTEM_OPERATION,
-            dangerCheck = { true },
             descriptionGenerator = { tool ->
                 val packageName = tool.parameters.find { it.name == "package_name" }?.value ?: ""
                 "停止应用: $packageName"
@@ -703,7 +702,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "ffmpeg_execute",
             category = ToolCategory.FILE_WRITE,
-            dangerCheck = { true }, // 总是危险操作，因为可能会修改文件
             descriptionGenerator = { tool ->
                 val command = tool.parameters.find { it.name == "command" }?.value ?: ""
                 "执行FFmpeg命令: $command"
@@ -729,7 +727,6 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = "ffmpeg_convert",
             category = ToolCategory.FILE_WRITE,
-            dangerCheck = { true }, // 总是危险操作，因为会创建新文件
             descriptionGenerator = { tool ->
                 val inputPath = tool.parameters.find { it.name == "input_path" }?.value ?: ""
                 val outputPath = tool.parameters.find { it.name == "output_path" }?.value ?: ""
@@ -764,4 +761,29 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             descriptionGenerator = { _ -> "获取支持的文件转换格式" },
             executor = { tool -> fileConverterTool.invoke(tool) }
     )
+
+    // Register dangerous operation check for shell commands
+    toolPermissionSystem.registerDangerousOperation(toolName) { tool ->
+        val command = tool.parameters.find { it.name == "command" }?.value?.toString() ?: ""
+        
+        // 只检查支付密码相关的危险命令
+        val paymentDangerousWords = listOf(
+            "pay", "payment", "支付", "银行", "bank", "financial", "财务"
+        )
+        
+        val passwordWords = listOf(
+            "password", "passwd", "密码", "pin"
+        )
+        
+        // 只有同时包含支付和密码相关词汇才认为危险
+        val containsPayment = paymentDangerousWords.any { word ->
+            command.contains(word, ignoreCase = true)
+        }
+        
+        val containsPassword = passwordWords.any { word ->
+            command.contains(word, ignoreCase = true)
+        }
+        
+        containsPayment && containsPassword
+    }
 }

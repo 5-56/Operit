@@ -38,7 +38,7 @@ enum class PermissionLevel {
                 "CAUTION" -> CAUTION
                 "ASK" -> ASK
                 "FORBID" -> FORBID
-                else -> ASK  // Default to ASK
+                else -> ALLOW  // 改为默认ALLOW而不是ASK
             }
         }
     }
@@ -57,11 +57,11 @@ enum class ToolCategory {
     companion object {
         fun getDefaultPermissionLevel(category: ToolCategory): PermissionLevel {
             return when (category) {
-                SYSTEM_OPERATION -> PermissionLevel.ASK
+                SYSTEM_OPERATION -> PermissionLevel.ALLOW // 改为ALLOW
                 NETWORK -> PermissionLevel.ALLOW
-                UI_AUTOMATION -> PermissionLevel.CAUTION
+                UI_AUTOMATION -> PermissionLevel.ALLOW // 改为ALLOW
                 FILE_READ -> PermissionLevel.ALLOW
-                FILE_WRITE -> PermissionLevel.ASK
+                FILE_WRITE -> PermissionLevel.ALLOW // 改为ALLOW
             }
         }
     }
@@ -85,7 +85,7 @@ class ToolPermissionSystem private constructor(private val context: Context) {
         private val FILE_WRITE_PERMISSION = stringPreferencesKey("file_write_permission")
         
         // Default permission setting
-        private val DEFAULT_MASTER_SWITCH = PermissionLevel.ASK.name
+        private val DEFAULT_MASTER_SWITCH = PermissionLevel.ALLOW.name // 改为ALLOW
         
         @Volatile
         private var INSTANCE: ToolPermissionSystem? = null
@@ -238,7 +238,20 @@ class ToolPermissionSystem private constructor(private val context: Context) {
      * Check if a tool operation is dangerous
      */
     fun isDangerousOperation(tool: AITool): Boolean {
-        return dangerousOperationsRegistry[tool.name]?.invoke(tool) ?: false
+        // 检查是否是支付或密码相关操作
+        val toolName = tool.name.lowercase()
+        val parameters = tool.parameters.map { it.name.lowercase() to it.value.toString().lowercase() }
+        
+        // 只有涉及支付密码、银行密码、登录密码等才认为是危险操作
+        val isPaymentPassword = toolName.contains("pay") || toolName.contains("payment") || 
+                                toolName.contains("bank") || toolName.contains("financial") ||
+                                parameters.any { (name, value) -> 
+                                    (name.contains("password") || name.contains("pin") || name.contains("密码")) &&
+                                    (value.contains("pay") || value.contains("bank") || value.contains("支付") || 
+                                     value.contains("银行") || value.contains("financial"))
+                                }
+        
+        return isPaymentPassword
     }
     
     /**
@@ -254,60 +267,31 @@ class ToolPermissionSystem private constructor(private val context: Context) {
     suspend fun checkToolPermission(tool: AITool): Boolean {
         Log.d(TAG, "Starting permission check: ${tool.name}")
         
-        // Check global permission switch
-        val masterSwitch = masterSwitchFlow.first()
-        
-        // If globally forbidden, all tools are denied
-        if (masterSwitch == PermissionLevel.FORBID) {
-            return false
-        }
-        
-        // If global ask, prompt for all tools
-        if (masterSwitch == PermissionLevel.ASK) {
+        // 检查是否是支付密码相关操作
+        if (isDangerousOperation(tool)) {
+            // 只有支付密码相关操作才需要用户确认
             return requestPermission(tool)
         }
         
-        // Get tool category
-        val toolCategory = tool.category ?: ToolCategory.UI_AUTOMATION
-        
-        // Get permission level for the category
-        val permissionLevel = when (toolCategory) {
-            ToolCategory.SYSTEM_OPERATION -> systemOperationPermissionFlow.first()
-            ToolCategory.NETWORK -> networkPermissionFlow.first()
-            ToolCategory.UI_AUTOMATION -> uiAutomationPermissionFlow.first()
-            ToolCategory.FILE_READ -> fileReadPermissionFlow.first()
-            ToolCategory.FILE_WRITE -> fileWritePermissionFlow.first()
-            // This case is actually unreachable since we cover all enum values above,
-            // but the Kotlin compiler needs this for type safety
-            else -> PermissionLevel.ASK
-        }
-        
-        return when (permissionLevel) {
-            PermissionLevel.ALLOW -> true
-            PermissionLevel.CAUTION -> {
-                val isDangerous = isDangerousOperation(tool)
-                if (isDangerous) requestPermission(tool) else true
-            }
-            PermissionLevel.ASK -> requestPermission(tool)
-            PermissionLevel.FORBID -> false
-        }
+        // 其他所有操作都直接允许
+        return true
     }
     
     /**
      * Request permission from the user to execute a tool
      */
     private suspend fun requestPermission(tool: AITool): Boolean {
-        // Get operation description
+        // 只有涉及支付密码的操作才会进入这里
         val operationDescription = getOperationDescription(tool)
         
-        Log.d(TAG, "Requesting permission: ${tool.name}")
+        Log.d(TAG, "Requesting permission for payment/password operation: ${tool.name}")
         
-        // Clear existing request
+        // 清除现有请求
         currentPermissionCallback = null
         permissionRequestInfo = null
         _permissionRequestState.value = null
         
-        // Set up new request
+        // 设置新请求
         val requestInfo = Pair(tool, operationDescription)
         permissionRequestInfo = requestInfo
         _permissionRequestState.value = requestInfo
@@ -316,15 +300,15 @@ class ToolPermissionSystem private constructor(private val context: Context) {
         
         return withTimeoutOrNull(PERMISSION_REQUEST_TIMEOUT_MS) {
             suspendCancellableCoroutine { continuation ->
-                // Set callback
+                // 设置回调
                 currentPermissionCallback = { result ->
                     Log.d(TAG, "Permission result received: $result for ${tool.name}")
-                    // Clean up state
+                    // 清理状态
                     currentPermissionCallback = null
                     permissionRequestInfo = null
                     _permissionRequestState.value = null
                     
-                    // Handle result
+                    // 处理结果
                     when (result) {
                         PermissionRequestResult.ALLOW -> continuation.resume(true)
                         PermissionRequestResult.DENY -> continuation.resume(false)
@@ -335,9 +319,9 @@ class ToolPermissionSystem private constructor(private val context: Context) {
                     }
                 }
                 
-                // Start permission request on main thread
+                // 在主线程开始权限请求
                 mainHandler.post {
-                    // Use overlay to show permission request
+                    // 使用覆盖层显示权限请求
                     if (!permissionRequestOverlay.hasOverlayPermission()) {
                         Log.w(TAG, "No overlay permission, requesting...")
                         permissionRequestOverlay.requestOverlayPermission()
@@ -350,7 +334,7 @@ class ToolPermissionSystem private constructor(private val context: Context) {
                 }
             }
         } ?: run {
-            // Timeout handling
+            // 超时处理
             Log.d(TAG, "Permission request timed out: ${tool.name}")
             currentPermissionCallback = null
             permissionRequestInfo = null

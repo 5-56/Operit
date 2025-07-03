@@ -75,7 +75,7 @@ private fun PermissionRequestContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "权限请求",
+                    text = "🔐 安全确认",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -84,16 +84,17 @@ private fun PermissionRequestContent(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = MaterialTheme.colorScheme.errorContainer
                     )
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "AI助手需要执行以下操作的权限：",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            text = "⚠️ 检测到支付或密码相关操作",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -102,24 +103,25 @@ private fun PermissionRequestContent(
                             text = operationDescription,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "工具: $toolName",
+                            text = "操作: $toolName",
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
 
-                        toolCategory?.let {
-                            Text(
-                                text = "类别: $it",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "此操作可能涉及支付密码或敏感信息，需要您的明确授权。",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
 
@@ -144,14 +146,14 @@ private fun PermissionRequestContent(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("允许")
+                        Text("我确认并授权")
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "* 您可以在设置中更改默认权限",
+                    text = "⚠️ 只有涉及支付密码的操作才会显示此确认\n其他所有操作已自动授权执行",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center

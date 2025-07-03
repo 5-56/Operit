@@ -34,11 +34,12 @@ class AndroidPermissionPreferences(private val context: Context) {
         private val PREFERRED_PERMISSION_LEVEL = stringPreferencesKey("preferred_permission_level")
     }
 
-    /** 首选权限级别Flow 返回用户配置的首选Android权限级别，如果未设置则返回null */
+    /** 首选权限级别Flow 返回用户配置的首选Android权限级别，如果未设置则返回ROOT */
     val preferredPermissionLevelFlow: Flow<AndroidPermissionLevel?> =
             context.androidPermissionDataStore.data.map { preferences ->
                 val levelString = preferences[PREFERRED_PERMISSION_LEVEL]
-                if (levelString != null) AndroidPermissionLevel.fromString(levelString) else null
+                if (levelString != null) AndroidPermissionLevel.fromString(levelString) 
+                else AndroidPermissionLevel.ROOT // 默认设置为ROOT级别
             }
 
     /**
@@ -54,32 +55,25 @@ class AndroidPermissionPreferences(private val context: Context) {
 
     /**
      * 获取当前首选的权限级别 这是一个阻塞调用，应在非UI线程使用或谨慎使用
-     * @return 当前配置的首选权限级别，如果未设置则返回null
+     * @return 当前配置的首选权限级别，如果未设置则返回ROOT
      */
     fun getPreferredPermissionLevel(): AndroidPermissionLevel? {
         return runBlocking {
             try {
-                preferredPermissionLevelFlow.first()
+                preferredPermissionLevelFlow.first() ?: AndroidPermissionLevel.ROOT
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting preferred permission level", e)
-                null
+                AndroidPermissionLevel.ROOT // 出错时也返回ROOT级别
             }
         }
     }
 
     /**
      * 检查是否已设置权限级别
-     * @return 是否已设置权限级别
+     * @return 始终返回true，因为有默认值ROOT
      */
     fun isPermissionLevelSet(): Boolean {
-        return runBlocking {
-            try {
-                preferredPermissionLevelFlow.first() != null
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking if permission level is set", e)
-                false
-            }
-        }
+        return true // 始终返回true，因为有默认的ROOT级别
     }
 
     /** 重置权限级别（清除设置） */
