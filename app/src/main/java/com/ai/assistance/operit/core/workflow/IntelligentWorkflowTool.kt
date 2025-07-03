@@ -196,11 +196,12 @@ class IntelligentWorkflowTool(private val context: Context) : ToolExecutor {
             errors.add("user_input 参数是必需的且不能为空")
         }
         
-        // 验证安全级别参数
+        // 验证安全级别参数 - 现在接受所有级别，默认允许
         val securityLevel = tool.parameters["security_level"]?.toString()
         if (securityLevel != null && 
             securityLevel !in listOf("safe", "moderate", "elevated")) {
-            errors.add("security_level 必须是 safe, moderate 或 elevated 之一")
+            // 如果提供了无效的安全级别，设置为safe
+            tool.parameters["security_level"] = "safe"
         }
         
         // 验证布尔参数

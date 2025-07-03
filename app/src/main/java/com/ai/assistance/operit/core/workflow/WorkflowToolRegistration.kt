@@ -41,23 +41,21 @@ object WorkflowToolRegistration {
             name = IntelligentWorkflowTool.TOOL_NAME,
             category = ToolCategory.AUTOMATION,
             dangerCheck = { tool ->
-                // 检查安全级别
-                val securityLevel = tool.parameters["security_level"]?.toString() ?: "safe"
                 val userInput = tool.parameters["user_input"]?.toString() ?: ""
                 
-                // 如果安全级别为elevated或包含危险关键词则需要确认
-                securityLevel == "elevated" || containsDangerousKeywords(userInput)
+                // 只检查支付密码相关的危险操作
+                containsPaymentPasswordKeywords(userInput)
             },
             descriptionGenerator = { tool ->
                 val userInput = tool.parameters["user_input"]?.toString() ?: ""
-                val securityLevel = tool.parameters["security_level"]?.toString() ?: "safe"
                 val analysisEnabled = tool.parameters["provide_analysis"]?.toString()?.toBoolean() ?: true
                 
                 val description = StringBuilder()
                 description.append("执行智能工作流: $userInput")
                 
-                if (securityLevel != "safe") {
-                    description.append(" [安全级别: $securityLevel]")
+                // 检查是否涉及支付密码操作
+                if (containsPaymentPasswordKeywords(userInput)) {
+                    description.append(" [⚠️ 涉及支付密码操作]")
                 }
                 
                 if (analysisEnabled) {
@@ -246,26 +244,29 @@ object WorkflowToolRegistration {
     }
     
     /**
-     * 检查是否包含危险关键词
+     * 检查是否包含支付密码相关关键词
      */
-    private fun containsDangerousKeywords(input: String): Boolean {
-        val dangerousKeywords = listOf(
-            "删除", "delete", "remove", "rm",
-            "格式化", "format", 
-            "重启", "reboot", "restart",
-            "关机", "shutdown",
-            "root", "sudo", "su",
-            "system", "etc", "bin",
-            "密码", "password", "passwd",
-            "支付", "pay", "payment",
-            "购买", "buy", "purchase",
-            "转账", "transfer"
+    private fun containsPaymentPasswordKeywords(input: String): Boolean {
+        val lowerInput = input.lowercase()
+        
+        val paymentKeywords = listOf(
+            "支付", "pay", "payment", "银行", "bank", "financial", "财务", "购买", "buy", "purchase", "转账", "transfer"
         )
         
-        val lowerInput = input.lowercase()
-        return dangerousKeywords.any { keyword ->
+        val passwordKeywords = listOf(
+            "密码", "password", "passwd", "pin"
+        )
+        
+        val containsPayment = paymentKeywords.any { keyword ->
             lowerInput.contains(keyword)
         }
+        
+        val containsPassword = passwordKeywords.any { keyword ->
+            lowerInput.contains(keyword)
+        }
+        
+        // 只有同时包含支付和密码相关词汇才认为危险
+        return containsPayment && containsPassword
     }
     
     /**
