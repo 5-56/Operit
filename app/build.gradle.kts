@@ -83,8 +83,8 @@ android {
 
 dependencies {
     implementation(libs.androidx.ui.graphics.android)
-    implementation(files("libs\\ffmpegkit.jar"))
-    implementation(files("libs\\arsc.jar"))
+    implementation(files("libs/ffmpegkit.jar"))
+    implementation(files("libs/arsc.jar"))
     // Desugaring support for modern Java APIs on older Android
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     
