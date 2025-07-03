@@ -2,6 +2,7 @@ package com.ai.assistance.operit.core.tools
 
 import android.content.Context
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
+import com.ai.assistance.operit.core.workflow.WorkflowToolRegistration
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.ui.permissions.ToolCategory
 import org.json.JSONArray
@@ -17,6 +18,12 @@ import org.json.JSONArray
  * @param context Application context for tools that need it
  */
 fun registerAllTools(handler: AIToolHandler, context: Context) {
+    
+    // ================================
+    // 注册智能工作流工具 - NEW!
+    // ================================
+    WorkflowToolRegistration.registerWorkflowTools(handler, context)
+    
     // 不在提示词加入的工具
     handler.registerTool(
             name = "execute_shell",
