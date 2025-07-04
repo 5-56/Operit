@@ -229,23 +229,23 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
 
     return object : Stream<StreamGroup<StreamPlugin?>> {
         // 实现Stream接口必须的属性
-        override val isLocked: Boolean get() = upstream.isLocked
-        override val bufferedCount: Int get() = upstream.bufferedCount
-        
+        override val isLocked: Boolean
+            get() = upstream.isLocked
+        override val bufferedCount: Int
+            get() = upstream.bufferedCount
+
         // 实现Stream接口必须的方法
         override suspend fun lock() = upstream.lock()
         override suspend fun unlock() = upstream.unlock()
         override fun clearBuffer() = upstream.clearBuffer()
-        
+
         override suspend fun collect(collector: StreamCollector<StreamGroup<StreamPlugin?>>) {
             coroutineScope {
                 val groupChannel = Channel<StreamGroup<StreamPlugin?>>(Channel.UNLIMITED)
 
                 launch { // Producer Coroutine
                     try {
-                        Log.d(TAG, "初始化 ${plugins.size} 个插件")
                         plugins.forEach {
-                            Log.d(TAG, "初始化插件: ${it.javaClass.simpleName}")
                             it.initPlugin()
                         }
 
@@ -277,14 +277,12 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                                 val stream =
                                         newChannel.consumeAsFlow().map { it.toString() }.asStream()
                                 groupChannel.send(StreamGroup(null, stream))
-                                Log.d(TAG, "打开默认文本通道")
                             }
                         }
 
                         suspend fun closeDefaultChannel() {
                             defaultTextChannel?.close()
                             defaultTextChannel = null
-                            Log.d(TAG, "关闭默认文本通道")
                         }
 
                         suspend fun openPluginChannel(plugin: StreamPlugin) {
@@ -293,11 +291,9 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                             activePlugin = plugin
                             val stream = newChannel.consumeAsFlow().map { it.toString() }.asStream()
                             groupChannel.send(StreamGroup(plugin, stream))
-                            Log.i(TAG, "激活插件: ${plugin.javaClass.simpleName}")
                         }
 
                         suspend fun closePluginChannel() {
-                            Log.i(TAG, "关闭插件通道: ${activePlugin?.javaClass?.simpleName ?: "无"}")
                             activePluginChannel?.close()
                             activePluginChannel = null
                             activePlugin = null
@@ -328,42 +324,33 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                                 }
 
                                 if (currentActivePlugin.state != PluginState.PROCESSING) {
-                                    Log.i(
-                                            TAG,
-                                            "插件 ${currentActivePlugin.javaClass.simpleName} 状态变更为: ${currentActivePlugin.state}"
-                                    )
-                                    
                                     // 处理WAITFOR状态 - 积累字符，等待确认或退出
                                     if (currentActivePlugin.state == PluginState.WAITFOR) {
-                                        Log.i(
-                                            TAG,
-                                            "插件 ${currentActivePlugin.javaClass.simpleName} 进入WAITFOR状态，开始积累字符"
-                                        )
-                                        
                                         // 创建WAITFOR缓冲区
                                         val waitforBuffer = mutableListOf<Char>()
                                         if (shouldEmit) {
                                             waitforBuffer.add(char)
                                         }
-                                        
+
                                         // 等待下一个字符决定去留
                                         var nextChar: Char? = null
                                         try {
                                             nextChar = upstreamChannel.receiveCatching().getOrNull()
                                         } catch (e: Exception) {
-                                            Log.w(TAG, "WAITFOR状态时接收字符失败: ${e.message}")
+                                            // WAITFOR状态时接收字符失败
                                         }
-                                        
+
                                         if (nextChar != null) {
                                             val isNextAtStartOfLine = (char == '\n')
-                                            val nextShouldEmit = currentActivePlugin.processChar(
-                                                nextChar,
-                                                isNextAtStartOfLine
-                                            )
-                                            
-                                            if (currentActivePlugin.state == PluginState.PROCESSING) {
+                                            val nextShouldEmit =
+                                                    currentActivePlugin.processChar(
+                                                            nextChar,
+                                                            isNextAtStartOfLine
+                                                    )
+
+                                            if (currentActivePlugin.state == PluginState.PROCESSING
+                                            ) {
                                                 // 确认继续处理 - 发射缓冲的字符
-                                                Log.i(TAG, "WAITFOR状态确认继续处理")
                                                 if (nextShouldEmit) {
                                                     activePluginChannel?.send(nextChar)
                                                 }
@@ -371,17 +358,19 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                                                 continue
                                             } else {
                                                 // 退出WAITFOR状态 - 返还所有字符
-                                                Log.i(TAG, "WAITFOR状态退出，返还字符")
                                                 pendingChars.addFirst(nextChar)
-                                                waitforBuffer.reversed().forEach { pendingChars.addFirst(it) }
+                                                waitforBuffer.reversed().forEach {
+                                                    pendingChars.addFirst(it)
+                                                }
                                             }
                                         } else {
                                             // 流结束，返还缓冲的字符
-                                            Log.i(TAG, "WAITFOR状态流结束，返还积累的字符")
-                                            waitforBuffer.reversed().forEach { pendingChars.addFirst(it) }
+                                            waitforBuffer.reversed().forEach {
+                                                pendingChars.addFirst(it)
+                                            }
                                         }
                                     }
-                                    
+
                                     closePluginChannel()
                                 }
                             } else {
@@ -397,35 +386,19 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                                 // 记录所有TRYING状态的插件
                                 val tryingPlugins =
                                         plugins.filter { it.state == PluginState.TRYING }
-                                if (tryingPlugins.isNotEmpty()) {
-                                    Log.v(
-                                            TAG,
-                                            "当前字符 '${char}' (ASCII: ${char.code}), 正在尝试匹配的插件: ${tryingPlugins.map { it.javaClass.simpleName }}"
-                                    )
-                                }
 
                                 val successfulPlugin =
                                         plugins.find { it.state == PluginState.PROCESSING }
 
                                 if (successfulPlugin != null) {
                                     // --- 转换：评估中 -> 处理中 ---
-                                    Log.i(
-                                            TAG,
-                                            "插件 ${successfulPlugin.javaClass.simpleName} 成功匹配并开始处理"
-                                    )
-
+                                    
                                     // 如果有多个插件可能同时匹配，记录潜在冲突
                                     val otherTryingPlugins =
                                             plugins.filter {
                                                 it != successfulPlugin &&
                                                         it.state == PluginState.TRYING
                                             }
-                                    if (otherTryingPlugins.isNotEmpty()) {
-                                        Log.w(
-                                                TAG,
-                                                "潜在冲突: 选中 ${successfulPlugin.javaClass.simpleName}, 但以下插件也在尝试匹配: ${otherTryingPlugins.map { it.javaClass.simpleName }}"
-                                        )
-                                    }
 
                                     closeDefaultChannel()
                                     openPluginChannel(successfulPlugin)
@@ -438,10 +411,6 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                                             activePluginChannel?.send(bufferedChar)
                                         }
                                     }
-                                    Log.d(
-                                            TAG,
-                                            "回放缓冲区 (大小: ${evaluationBuffer.size}) 到插件 ${successfulPlugin.javaClass.simpleName}"
-                                    )
                                     evaluationBuffer.clear()
                                     evaluationShouldEmit.clear()
 
@@ -450,7 +419,6 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                                 } else if (plugins.none { it.state == PluginState.TRYING }) {
                                     // --- 转换：评估中 -> 空闲 ---
                                     // 没有插件处于TRYING状态，意味着匹配失败
-                                    // Log.d(TAG, "所有插件匹配失败, 切换到默认文本通道")
                                     openDefaultChannel()
                                     evaluationBuffer.forEach { defaultTextChannel?.send(it) }
                                     evaluationBuffer.clear()
@@ -464,12 +432,10 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
                         }
 
                         // 流结束后，关闭所有剩余通道并清空缓冲区
-                        Log.d(TAG, "流处理完成，清理资源")
                         closeDefaultChannel()
                         closePluginChannel()
 
                         if (evaluationBuffer.isNotEmpty()) {
-                            Log.d(TAG, "处理剩余的评估缓冲区，大小: ${evaluationBuffer.size}")
                             openDefaultChannel()
                             evaluationBuffer.forEach { defaultTextChannel?.send(it) }
                             closeDefaultChannel()
@@ -499,16 +465,18 @@ fun Stream<Char>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<Stream
 fun Stream<String>.splitBy(plugins: List<StreamPlugin>): Stream<StreamGroup<StreamPlugin?>> {
     val TAG = "StringStreamSplitter"
     val upstream = this
-    
+
     // 创建一个包装的Stream，附带委托功能
-    val delegatingStream = object : Stream<String> by upstream {
-        override suspend fun collect(collector: StreamCollector<String>) {
-            upstream.collect(collector)
-        }
-    }
-    
+    val delegatingStream =
+            object : Stream<String> by upstream {
+                override suspend fun collect(collector: StreamCollector<String>) {
+                    upstream.collect(collector)
+                }
+            }
+
     // 将字符串流转换为字符流
-    return delegatingStream.flatMap { str ->
+    return delegatingStream
+            .flatMap { str ->
                 stream {
                     for (char in str) {
                         emit(char)
@@ -535,13 +503,11 @@ fun <T> Stream<T>.delay(duration: Duration): Stream<T> = stream {
     }
 }
 
-/** 
- * 防抖操作，仅在指定时间内没有新值到来时才发射最后一个值 
- */
+/** 防抖操作，仅在指定时间内没有新值到来时才发射最后一个值 */
 fun <T> Stream<T>.debounce(timeout: Duration): Stream<T> = stream {
     var lastValue: T? = null
     var lastEmitJob: Job? = null
-    
+
     coroutineScope {
         collect { value ->
             lastValue = value
@@ -549,7 +515,6 @@ fun <T> Stream<T>.debounce(timeout: Duration): Stream<T> = stream {
             lastEmitJob = launch {
                 delay(timeout.inWholeMilliseconds)
                 lastValue?.let {
-                    StreamLogger.v("Stream.debounce", "发射防抖元素: $it")
                     emit(it)
                 }
             }
@@ -558,26 +523,24 @@ fun <T> Stream<T>.debounce(timeout: Duration): Stream<T> = stream {
 }
 
 /**
- * 采样操作，以固定时间间隔发射最近的一个值
- * 即使没有新值到来也会按间隔发射最后已知的值
+ * 采样操作，以固定时间间隔发射最近的一个值 即使没有新值到来也会按间隔发射最后已知的值
  *
  * @param period 采样间隔
  */
 fun <T> Stream<T>.sample(period: Duration): Stream<T> = stream {
     var latestValue: Any? = NoValue
     var hasValue = false
-    
+
     coroutineScope {
         launch {
             while (true) {
                 delay(period.inWholeMilliseconds)
                 if (hasValue) {
-                    @Suppress("UNCHECKED_CAST")
-                    emit(latestValue as T)
+                    @Suppress("UNCHECKED_CAST") emit(latestValue as T)
                 }
             }
         }
-        
+
         collect { value ->
             latestValue = value
             hasValue = true
@@ -586,8 +549,7 @@ fun <T> Stream<T>.sample(period: Duration): Stream<T> = stream {
 }
 
 /**
- * 节流操作，在指定的时间窗口内仅发射最后一个元素
- * 与throttleFirst相反，throttleFirst保留窗口内第一个元素
+ * 节流操作，在指定的时间窗口内仅发射最后一个元素 与throttleFirst相反，throttleFirst保留窗口内第一个元素
  *
  * @param windowDuration 时间窗口大小
  */
@@ -595,16 +557,16 @@ fun <T> Stream<T>.throttleLast(windowDuration: Duration): Stream<T> = stream {
     var lastEmitTime = 0L
     var pendingValue: T? = null
     var hasPending = false
-    
+
     collect { value ->
         val currentTime = System.currentTimeMillis()
         pendingValue = value
         hasPending = true
-        
+
         if (currentTime - lastEmitTime >= windowDuration.inWholeMilliseconds) {
             lastEmitTime = currentTime
             if (hasPending) {
-                pendingValue?.let { 
+                pendingValue?.let {
                     emit(it)
                     hasPending = false
                 }
@@ -614,17 +576,16 @@ fun <T> Stream<T>.throttleLast(windowDuration: Duration): Stream<T> = stream {
 }
 
 /**
- * 以固定频率限制发射的值，如果在时间内没有值，则等待下个周期
- * 与sample不同，fixedRate只会发射实际接收到的值，不会重复发射同一个值
+ * 以固定频率限制发射的值，如果在时间内没有值，则等待下个周期 与sample不同，fixedRate只会发射实际接收到的值，不会重复发射同一个值
  *
  * @param period 固定周期
  */
 fun <T> Stream<T>.fixedRate(period: Duration): Stream<T> = stream {
     var nextEmitTime = 0L
-    
+
     collect { value ->
         val currentTime = System.currentTimeMillis()
-        
+
         if (nextEmitTime == 0L) {
             // 第一个元素立即发射
             nextEmitTime = currentTime + period.inWholeMilliseconds
@@ -645,38 +606,39 @@ fun <T> Stream<T>.fixedRate(period: Duration): Stream<T> = stream {
 
 /**
  * 在超时时间内每次有新值都会重新计时，如果超时则发出超时信号并终止
- * 
+ *
  * @param timeoutDuration 超时时间
  * @param timeoutValue 超时时发射的值，如果为null则不发射值
  */
-fun <T> Stream<T>.timeoutTrigger(timeoutDuration: Duration, timeoutValue: T? = null): Stream<T> = stream {
-    var timeoutJob: Job? = null
-    
-    try {
-        coroutineScope {
-            timeoutJob = launch {
-                delay(timeoutDuration)
-                if (timeoutValue != null) {
-                    emit(timeoutValue)
-                }
-                throw TimeoutException("Stream timeoutTrigger after $timeoutDuration")
-            }
-            
-            this@timeoutTrigger.collect { value ->
-                timeoutJob?.cancel()
-                timeoutJob = launch {
-                    delay(timeoutDuration)
-                    if (timeoutValue != null) {
-                        emit(timeoutValue)
+fun <T> Stream<T>.timeoutTrigger(timeoutDuration: Duration, timeoutValue: T? = null): Stream<T> =
+        stream {
+            var timeoutJob: Job? = null
+
+            try {
+                coroutineScope {
+                    timeoutJob = launch {
+                        delay(timeoutDuration)
+                        if (timeoutValue != null) {
+                            emit(timeoutValue)
+                        }
+                        throw TimeoutException("Stream timeoutTrigger after $timeoutDuration")
                     }
-                    throw TimeoutException("Stream timeoutTrigger after $timeoutDuration")
+
+                    this@timeoutTrigger.collect { value ->
+                        timeoutJob?.cancel()
+                        timeoutJob = launch {
+                            delay(timeoutDuration)
+                            if (timeoutValue != null) {
+                                emit(timeoutValue)
+                            }
+                            throw TimeoutException("Stream timeoutTrigger after $timeoutDuration")
+                        }
+                        emit(value)
+                    }
                 }
-                emit(value)
+            } catch (e: TimeoutException) {
+                // 流已超时
+            } finally {
+                timeoutJob?.cancel()
             }
         }
-    } catch (e: TimeoutException) {
-        StreamLogger.d("Stream.timeoutTrigger", "流已超时: ${e.message}")
-    } finally {
-        timeoutJob?.cancel()
-    }
-}

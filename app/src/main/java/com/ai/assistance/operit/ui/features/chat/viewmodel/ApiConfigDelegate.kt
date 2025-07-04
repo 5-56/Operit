@@ -3,15 +3,17 @@ package com.ai.assistance.operit.ui.features.chat.viewmodel
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.viewModelScope
-import com.ai.assistance.operit.api.EnhancedAIService
+import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** 委托类，负责管理用户偏好配置和API密钥 */
 class ApiConfigDelegate(
@@ -31,9 +33,6 @@ class ApiConfigDelegate(
     // State flows
     private val _isConfigured = MutableStateFlow(true) // 默认已配置
     val isConfigured: StateFlow<Boolean> = _isConfigured.asStateFlow()
-
-    private val _showThinking = MutableStateFlow(ApiPreferences.DEFAULT_SHOW_THINKING)
-    val showThinking: StateFlow<Boolean> = _showThinking.asStateFlow()
 
     private val _enableAiPlanning = MutableStateFlow(ApiPreferences.DEFAULT_ENABLE_AI_PLANNING)
     val enableAiPlanning: StateFlow<Boolean> = _enableAiPlanning.asStateFlow()
@@ -64,19 +63,18 @@ class ApiConfigDelegate(
         // 加载用户偏好设置
         initializeSettingsCollection()
 
-        // 创建新的AI服务实例并通知
-        val enhancedAiService = EnhancedAIService(context)
-        onConfigChanged(enhancedAiService)
+        // 异步创建AI服务实例，避免在主线程上执行阻塞操作
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.d(TAG, "开始在后台线程创建EnhancedAIService")
+            val enhancedAiService = EnhancedAIService.getInstance(context)
+            Log.d(TAG, "EnhancedAIService创建完成")
+            withContext(Dispatchers.Main) {
+                onConfigChanged(enhancedAiService)
+            }
+        }
     }
 
     private fun initializeSettingsCollection() {
-        // Collect show thinking preference
-        viewModelScope.launch {
-            apiPreferences.showThinkingFlow.collect { showThinkingValue ->
-                _showThinking.value = showThinkingValue
-            }
-        }
-
         // Collect AI planning setting
         viewModelScope.launch {
             apiPreferences.enableAiPlanningFlow.collect { enableAiPlanningValue ->
@@ -97,12 +95,15 @@ class ApiConfigDelegate(
      * @return 总是返回true，因为无需特定配置
      */
     fun useDefaultConfig(): Boolean {
-        // 在多AI提供商架构下，总是可以使用默认配置
-        Log.d(TAG, "使用默认配置初始化服务")
-        val enhancedAiService = EnhancedAIService(context)
-
-        // 通知ViewModel配置已更改
-        onConfigChanged(enhancedAiService)
+        // 异步创建服务，避免阻塞
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.d(TAG, "使用默认配置初始化服务")
+            val enhancedAiService = EnhancedAIService.getInstance(context)
+            withContext(Dispatchers.Main) {
+                // 通知ViewModel配置已更改
+                onConfigChanged(enhancedAiService)
+            }
+        }
         return true
     }
 
@@ -129,8 +130,10 @@ class ApiConfigDelegate(
 
                 Log.d(TAG, "API密钥已保存到ModelConfigManager")
 
-                // 直接调用初始化服务
-                val enhancedAiService = EnhancedAIService(context)
+                // 在IO线程上创建服务，避免阻塞
+                val enhancedAiService = withContext(Dispatchers.IO) {
+                    EnhancedAIService.getInstance(context)
+                }
 
                 // 通知ViewModel配置已更改
                 onConfigChanged(enhancedAiService)
@@ -149,24 +152,6 @@ class ApiConfigDelegate(
             val newValue = !_enableAiPlanning.value
             apiPreferences.saveEnableAiPlanning(newValue)
             _enableAiPlanning.value = newValue
-        }
-    }
-
-    /** 切换显示思考过程 */
-    fun toggleShowThinking() {
-        viewModelScope.launch {
-            val newValue = !_showThinking.value
-            apiPreferences.saveShowThinking(newValue)
-            _showThinking.value = newValue
-        }
-    }
-
-    /** 切换内存优化 */
-    fun toggleMemoryOptimization() {
-        viewModelScope.launch {
-            val newValue = !_memoryOptimization.value
-            apiPreferences.saveMemoryOptimization(newValue)
-            _memoryOptimization.value = newValue
         }
     }
 }

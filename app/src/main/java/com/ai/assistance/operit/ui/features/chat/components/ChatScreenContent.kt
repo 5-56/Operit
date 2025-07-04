@@ -5,19 +5,18 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.webkit.WebView
-import android.widget.LinearLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -39,6 +38,7 @@ import com.ai.assistance.operit.data.model.PlanItem
 import com.ai.assistance.operit.data.model.ToolExecutionProgress
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
+import com.ai.assistance.operit.ui.features.chat.webview.WebViewHandler
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -49,7 +49,6 @@ fun ChatScreenContent(
         actualViewModel: ChatViewModel,
         showChatHistorySelector: Boolean,
         chatHistory: List<ChatMessage>,
-        listState: LazyListState,
         planItems: List<PlanItem>,
         enableAiPlanning: Boolean,
         toolProgress: ToolExecutionProgress,
@@ -73,6 +72,7 @@ fun ChatScreenContent(
         verticalDrag: Float,
         onVerticalDragChange: (Float) -> Unit,
         dragThreshold: Float,
+        scrollState: ScrollState,
         showScrollButton: Boolean,
         onShowScrollButtonChange: (Boolean) -> Unit,
         autoScrollToBottom: Boolean,
@@ -207,161 +207,96 @@ fun ChatScreenContent(
                 )
 
                 // 聊天对话区域
-                Box(
-                        modifier =
-                                Modifier.fillMaxSize()
-                                        .background(
-                                                if (hasBackgroundImage) Color.Transparent
-                                                else MaterialTheme.colorScheme.background
-                                        )
-                ) {
-                    // 只有在不显示WebView时才显示聊天区域
-                    if (!showWebView) {
-                        ChatArea(
-                                chatHistory = chatHistory,
-                                listState = listState,
-                                planItems = planItems,
-                                enablePlanning = enableAiPlanning,
-                                toolProgress = toolProgress,
-                                isLoading = isLoading,
-                                userMessageColor = userMessageColor,
-                                aiMessageColor = aiMessageColor,
-                                userTextColor = userTextColor,
-                                aiTextColor = aiTextColor,
-                                systemMessageColor = systemMessageColor,
-                                systemTextColor = systemTextColor,
-                                thinkingBackgroundColor = thinkingBackgroundColor,
-                                thinkingTextColor = thinkingTextColor,
-                                hasBackgroundImage = hasBackgroundImage,
-                                modifier = Modifier.fillMaxSize(),
-                                isEditMode = isEditMode.value,
-                                onSelectMessageToEdit = { index, message ->
-                                    editingMessageIndex.value = index
-                                    editingMessageContent.value = message.content
-                                }
-                        )
+                Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
+                    // 始终显示聊天区域，不再使用if条件判断
+                    ChatArea(
+                            chatHistory = chatHistory,
+                            scrollState = scrollState,
+                            planItems = planItems,
+                            enablePlanning = enableAiPlanning,
+                            toolProgress = toolProgress,
+                            isLoading = isLoading,
+                            userMessageColor = userMessageColor,
+                            aiMessageColor = aiMessageColor,
+                            userTextColor = userTextColor,
+                            aiTextColor = aiTextColor,
+                            systemMessageColor = systemMessageColor,
+                            systemTextColor = systemTextColor,
+                            thinkingBackgroundColor = thinkingBackgroundColor,
+                            thinkingTextColor = thinkingTextColor,
+                            hasBackgroundImage = hasBackgroundImage,
+                            modifier = Modifier.fillMaxSize(),
+                            isEditMode = isEditMode.value,
+                            onSelectMessageToEdit = { index, message ->
+                                editingMessageIndex.value = index
+                                editingMessageContent.value = message.content
+                            }
+                    )
 
-                        // 编辑模式下的操作面板
-                        if (isEditMode.value && editingMessageIndex.value != null) {
-                            MessageEditPanel(
-                                    editingMessageContent = editingMessageContent,
-                                    onCancel = {
+                    // 编辑模式下的操作面板
+                    if (isEditMode.value && editingMessageIndex.value != null) {
+                        MessageEditPanel(
+                                editingMessageContent = editingMessageContent,
+                                onCancel = {
+                                    editingMessageIndex.value = null
+                                    editingMessageContent.value = ""
+                                },
+                                onSave = {
+                                    val index = editingMessageIndex.value
+                                    if (index != null && index < chatHistory.size) {
+                                        val editedMessage =
+                                                chatHistory[index].copy(
+                                                        content = editingMessageContent.value
+                                                )
+                                        actualViewModel.updateMessage(index, editedMessage)
+
+                                        // 重置编辑状态
                                         editingMessageIndex.value = null
                                         editingMessageContent.value = ""
-                                    },
-                                    onSave = {
-                                        val index = editingMessageIndex.value
-                                        if (index != null && index < chatHistory.size) {
-                                            val editedMessage =
-                                                    chatHistory[index].copy(
-                                                            content = editingMessageContent.value
-                                                    )
-                                            actualViewModel.updateMessage(index, editedMessage)
-
-                                            // 重置编辑状态
-                                            editingMessageIndex.value = null
-                                            editingMessageContent.value = ""
-                                            isEditMode.value = false
-                                        }
-                                    },
-                                    onResend = {
-                                        val index = editingMessageIndex.value
-                                        if (index != null && index < chatHistory.size) {
-                                            actualViewModel.rewindAndResendMessage(
-                                                    index,
-                                                    editingMessageContent.value
-                                            )
-
-                                            // 重置编辑状态
-                                            editingMessageIndex.value = null
-                                            editingMessageContent.value = ""
-                                            isEditMode.value = false
-                                        }
+                                        isEditMode.value = false
                                     }
-                            )
-                        }
-                    } else {
+                                },
+                                onResend = {
+                                    val index = editingMessageIndex.value
+                                    if (index != null && index < chatHistory.size) {
+                                        actualViewModel.rewindAndResendMessage(
+                                                index,
+                                                editingMessageContent.value
+                                        )
+
+                                        // 重置编辑状态
+                                        editingMessageIndex.value = null
+                                        editingMessageContent.value = ""
+                                        isEditMode.value = false
+                                    }
+                                }
+                        )
+                    }
+
+                    // 仅当showWebView为true时才显示WebView，将其覆盖在ChatArea上方
+                    if (showWebView) {
                         // 显示WebView
                         var webView by remember { mutableStateOf<WebView?>(null) }
+                        val webViewHandler = remember { WebViewHandler(context) }
+
+                        // 设置文件选择回调
+                        webViewHandler.onFileChooserRequest = { intent, callback ->
+                            actualViewModel.startFileChooserForResult(intent) { resultCode, data ->
+                                callback(resultCode, data)
+                            }
+                        }
 
                         AndroidView(
                                 factory = { context ->
-                                    android.webkit.WebView(context).apply {
-                                        // 创建更强大的WebViewClient
-                                        webViewClient =
-                                                object : android.webkit.WebViewClient() {
-                                                    override fun onPageFinished(
-                                                            view: android.webkit.WebView?,
-                                                            url: String?
-                                                    ) {
-                                                        super.onPageFinished(view, url)
-                                                        // 页面加载完成后执行的操作
-                                                    }
-                                                }
-
-                                        // 添加WebChromeClient以支持更现代的Web功能
-                                        // webChromeClient = android.webkit.WebChromeClient()
-
-                                        // 设置WebView的各种配置
-                                        settings.apply {
-                                            layoutParams =
-                                                    LinearLayout.LayoutParams(
-                                                            LinearLayout.LayoutParams.MATCH_PARENT,
-                                                            LinearLayout.LayoutParams.MATCH_PARENT,
-                                                            1.0f
-                                                    )
-                                            // 启用JavaScript
-                                            javaScriptEnabled = true
-
-                                            // 设置适用于现代网页的关键配置
-                                            // 视口设置
-                                            useWideViewPort = true // 启用宽视口
-                                            loadWithOverviewMode = true // 使页面适应屏幕大小
-                                            isNestedScrollingEnabled = true
-
-                                            // 缩放控制
-                                            setSupportZoom(true) // 支持缩放
-                                            builtInZoomControls = true // 启用内置缩放控件
-                                            displayZoomControls = false // 隐藏默认缩放控件
-
-                                            // 文本设置
-                                            defaultTextEncodingName = "UTF-8" // 设置默认字符集
-
-                                            // 缓存设置
-                                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-
-                                            // 使页面适应当前尺寸
-                                            layoutAlgorithm =
-                                                    android.webkit.WebSettings.LayoutAlgorithm
-                                                            .NORMAL
-
-                                            // 设置用户代理，添加自定义标识符以便更好地适配
-                                            val defaultUserAgent = userAgentString
-                                            userAgentString = "$defaultUserAgent OperitWebView/1.0"
-
-                                            // 启用DOM存储API
-                                            domStorageEnabled = true
-
-                                            // 启用应用缓存
-                                            databaseEnabled = true
-                                        }
-
-                                        // 设置初始比例 - 匹配显示宽度
-                                        setInitialScale(0)
-
-                                        // 添加触摸事件监听器优化滑动体验
-                                        setOnTouchListener { v, event ->
-                                            // 允许WebView处理所有触摸事件
-                                            v.parent.requestDisallowInterceptTouchEvent(true)
-                                            false // 返回false表示不消费事件，让WebView默认行为继续处理
-                                        }
-
-                                        // 加载URL
-                                        loadUrl("http://localhost:8080")
-
-                                        // 保存WebView引用以便获取工作目录
-                                        webView = this
-                                    }
+                                    val webView = WebView(context)
+                                    // 使用WebViewHandler配置WebView
+                                    webViewHandler.configureWebView(webView)
+                                    // 记录WebView引用以便JavaScript注入
+                                    webViewHandler.currentWebView = webView
+                                    // 加载URL
+                                    webView.loadUrl("http://localhost:8080")
+                                    // 保存WebView引用以便获取工作目录
+                                    return@AndroidView webView
                                 },
                                 update = { webView ->
                                     // 当需要刷新WebView内容时更新
@@ -369,6 +304,8 @@ fun ChatScreenContent(
                                         webView.reload()
                                         onWebViewRefreshed()
                                     }
+                                    // 确保WebViewHandler有当前WebView引用
+                                    webViewHandler.currentWebView = webView
                                 },
                                 modifier = Modifier.fillMaxSize()
                         )
@@ -396,8 +333,8 @@ fun ChatScreenContent(
                         }
                     }
 
-                    // 滚动到底部按钮 - 仅在聊天区域显示时显示
-                    if (showScrollButton && !showWebView) {
+                    // 滚动到底部按钮 - 仅在可见区域需要时显示，不再受WebView显示状态影响
+                    if (showScrollButton) {
                         Box(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.BottomEnd
@@ -413,7 +350,9 @@ fun ChatScreenContent(
                                                 try {
                                                     // 不关心index，直接尝试滚动到底部
                                                     // 使用最大可能的滚动量
-                                                    listState.dispatchRawDelta(100000f)
+                                                    scrollState.animateScrollTo(
+                                                            scrollState.maxValue
+                                                    )
                                                 } catch (e: Exception) {
                                                     Log.e("ChatScreenContent", "滚动到底部失败", e)
                                                 }

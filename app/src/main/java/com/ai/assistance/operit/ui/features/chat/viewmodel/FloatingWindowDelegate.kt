@@ -9,10 +9,16 @@ import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Typography
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
+import com.ai.assistance.operit.data.model.toSerializable
+import com.ai.assistance.operit.data.preferences.PromptFunctionType
 import com.ai.assistance.operit.services.FloatingChatService
+import com.ai.assistance.operit.ui.floating.FloatingMode
+import com.ai.assistance.operit.util.stream.SharedStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,9 +29,10 @@ import kotlinx.coroutines.launch
 class FloatingWindowDelegate(
         private val context: Context,
         private val viewModelScope: CoroutineScope,
-        private val onMessageReceived: (String) -> Unit,
+        private val onMessageReceived: (String, PromptFunctionType) -> Unit,
         private val onAttachmentRequested: (String) -> Unit,
-        private val onAttachmentRemoveRequested: (String) -> Unit
+        private val onAttachmentRemoveRequested: (String) -> Unit,
+        private val onCancelMessageRequested: () -> Unit
 ) {
     companion object {
         private const val TAG = "FloatingWindowDelegate"
@@ -42,7 +49,12 @@ class FloatingWindowDelegate(
     private val serviceConnection =
             object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                    floatingService = (service as? FloatingChatService.LocalBinder)?.getService()
+                    val binder = service as FloatingChatService.LocalBinder
+                    floatingService = binder.getService()
+                    // 设置回调，允许服务通知委托关闭
+                    binder.setCloseCallback {
+                        closeFloatingWindow()
+                    }
                     // 设置消息收集
                     setupMessageCollection()
                 }
@@ -52,48 +64,88 @@ class FloatingWindowDelegate(
                 }
             }
 
-    // 广播接收器，用于接收悬浮窗关闭的广播
-    private val floatingWindowReceiver =
-            object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
-                    if (intent.action == "com.ai.assistance.operit.FLOATING_WINDOW_CLOSED") {
-                        // 更新悬浮窗状态
-                        _isFloatingMode.value = false
-                    }
-                }
-            }
-
     init {
-        // 注册悬浮窗关闭的广播接收器
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.registerReceiver(
-                    floatingWindowReceiver,
-                    IntentFilter("com.ai.assistance.operit.FLOATING_WINDOW_CLOSED"),
-                    Context.RECEIVER_NOT_EXPORTED
-            )
-        } else {
-            context.registerReceiver(
-                    floatingWindowReceiver,
-                    IntentFilter("com.ai.assistance.operit.FLOATING_WINDOW_CLOSED")
-            )
-        }
+        // 不再需要注册广播接收器
     }
 
     /** 切换悬浮窗模式 */
-    fun toggleFloatingMode() {
+    fun toggleFloatingMode(colorScheme: ColorScheme? = null, typography: Typography? = null) {
         val newMode = !_isFloatingMode.value
         _isFloatingMode.value = newMode
 
         if (newMode) {
-            // 绑定服务
+            // 启动并绑定服务
             val intent = Intent(context, FloatingChatService::class.java)
+            colorScheme?.let {
+                intent.putExtra("COLOR_SCHEME", it.toSerializable())
+            }
+            typography?.let {
+                intent.putExtra("TYPOGRAPHY", it.toSerializable())
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
             context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         } else {
-            // 解绑服务
+            // 解绑并停止服务
             try {
                 context.unbindService(serviceConnection)
             } catch (e: Exception) {
                 Log.e(TAG, "解绑服务失败", e)
+            }
+            context.stopService(Intent(context, FloatingChatService::class.java))
+            floatingService = null
+        }
+    }
+
+    /**
+     * 启动悬浮窗并指定一个初始模式
+     */
+    fun launchInMode(
+            mode: FloatingMode,
+            colorScheme: ColorScheme? = null,
+            typography: Typography? = null
+    ) {
+        if (_isFloatingMode.value && floatingService != null) {
+            // 如果服务已在运行，直接切换模式
+            floatingService?.switchToMode(mode)
+            Log.d(TAG, "悬浮窗已在运行，直接切换到模式: $mode")
+            return
+        }
+
+        _isFloatingMode.value = true
+
+        val intent = Intent(context, FloatingChatService::class.java)
+        // 添加初始模式参数
+        intent.putExtra("INITIAL_MODE", mode.name)
+
+        colorScheme?.let {
+            intent.putExtra("COLOR_SCHEME", it.toSerializable())
+        }
+        typography?.let {
+            intent.putExtra("TYPOGRAPHY", it.toSerializable())
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    /**
+     * 由服务回调或用户操作调用，用于关闭悬浮窗并更新状态
+     */
+    private fun closeFloatingWindow() {
+        if (_isFloatingMode.value) {
+            _isFloatingMode.value = false
+            // 停止并解绑服务
+            try {
+                context.unbindService(serviceConnection)
+            } catch (e: IllegalArgumentException) {
+                Log.e(TAG, "服务可能已解绑: ${e.message}")
             }
             floatingService = null
         }
@@ -105,13 +157,26 @@ class FloatingWindowDelegate(
             // 收集消息
             viewModelScope.launch {
                 try {
-                    service.messageToSend.collect { message ->
-                        Log.d(TAG, "从悬浮窗接收到消息: $message")
+                    service.messageToSend.collect { messagePair ->
+                        Log.d(TAG, "从悬浮窗接收到消息: ${messagePair.first}，模式: ${messagePair.second}")
                         // 处理消息
-                        onMessageReceived(message)
+                        onMessageReceived(messagePair.first, messagePair.second)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "从悬浮窗收集消息时出错", e)
+                }
+            }
+            
+            // 收集取消消息请求
+            viewModelScope.launch {
+                try {
+                    service.cancelMessageRequest.collect {
+                        Log.d(TAG, "从悬浮窗接收到取消消息请求")
+                        // 处理取消消息请求
+                        onCancelMessageRequested()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "从悬浮窗收集取消消息请求时出错", e)
                 }
             }
 
@@ -145,6 +210,7 @@ class FloatingWindowDelegate(
 
     /** 更新悬浮窗消息 */
     fun updateFloatingWindowMessages(messages: List<ChatMessage>) {
+        Log.d(TAG, "更新悬浮窗消息: ${messages.size} 条. 最后一条消息的 stream is null: ${messages.lastOrNull()?.contentStream == null}")
         floatingService?.updateChatMessages(messages)
     }
 
@@ -159,19 +225,12 @@ class FloatingWindowDelegate(
     /** 清理资源 */
     fun cleanup() {
         // 解绑服务
-        if (_isFloatingMode.value) {
+        if (floatingService != null) {
             try {
                 context.unbindService(serviceConnection)
             } catch (e: Exception) {
                 Log.e(TAG, "在清理时解绑服务失败", e)
             }
-        }
-
-        // 取消注册广播接收器
-        try {
-            context.unregisterReceiver(floatingWindowReceiver)
-        } catch (e: Exception) {
-            Log.e(TAG, "取消注册接收器失败", e)
         }
     }
 }

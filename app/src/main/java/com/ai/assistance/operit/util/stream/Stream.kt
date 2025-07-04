@@ -122,7 +122,7 @@ abstract class AbstractStream<T> : Stream<T> {
                 // StreamLogger.d("Stream", "流已锁定")
                 isLockedFlag.set(true)
             } else if (isClosedFlag.get()) {
-                StreamLogger.d("Stream", "流已关闭，锁定操作被忽略")
+                // StreamLogger.d("Stream", "流已关闭，锁定操作被忽略")
             }
         }
     }
@@ -132,7 +132,7 @@ abstract class AbstractStream<T> : Stream<T> {
             if (isLockedFlag.compareAndSet(true, false)) {
                 val bufferSize = buffer.size
                 if (bufferSize > 0) {
-                    StreamLogger.d("Stream", "流已解锁，发送缓存数据 (${bufferSize}项)")
+                    // StreamLogger.d("Stream", "流已解锁，发送缓存数据 (${bufferSize}项)")
                     val tempList = ArrayList<T>(buffer)
                     buffer.clear()
                 

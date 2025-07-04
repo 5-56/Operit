@@ -9,8 +9,8 @@ import com.ai.assistance.operit.data.model.MessageEntity
 /** 消息DAO接口，定义对消息表的数据访问方法 */
 @Dao
 interface MessageDao {
-    /** 获取指定聊天的所有消息，按序号排序 */
-    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY orderIndex ASC")
+    /** 获取指定聊天的所有消息，按时间戳排序 */
+    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC")
     suspend fun getMessagesForChat(chatId: String): List<MessageEntity>
 
     /** 插入单条消息并返回消息ID */
@@ -32,8 +32,12 @@ interface MessageDao {
     /** 删除指定聊天的所有消息 */
     @Query("DELETE FROM messages WHERE chatId = :chatId")
     suspend fun deleteAllMessagesForChat(chatId: String)
-    
+
     /** 根据时间戳查找消息 */
     @Query("SELECT * FROM messages WHERE chatId = :chatId AND timestamp = :timestamp LIMIT 1")
     suspend fun getMessageByTimestamp(chatId: String, timestamp: Long): MessageEntity?
+
+    /** 删除指定聊天中从某个时间戳开始的所有消息 */
+    @Query("DELETE FROM messages WHERE chatId = :chatId AND timestamp >= :timestamp")
+    suspend fun deleteMessagesFrom(chatId: String, timestamp: Long)
 }

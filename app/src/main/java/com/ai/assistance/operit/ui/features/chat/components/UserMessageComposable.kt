@@ -70,7 +70,7 @@ fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColo
         val selectedAttachmentName = remember { mutableStateOf("") }
 
         // Parse message content to separate text and attachments
-        val parseResult = parseMessageContent(message.content)
+        val parseResult = remember(message.content) { parseMessageContent(message.content) }
         val textContent = parseResult.processedText
         val trailingAttachments = parseResult.trailingAttachments
 
@@ -135,7 +135,7 @@ fun UserMessageComposable(message: ChatMessage, backgroundColor: Color, textColo
                                 )
 
                                 // Display main text content with inline attachments
-                                MarkdownTextComposable(text = textContent, textColor = textColor)
+                                Text(text = textContent, color = textColor,style = MaterialTheme.typography.bodyMedium)
                         }
                 }
         }

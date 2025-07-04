@@ -18,6 +18,9 @@ import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import kotlinx.coroutines.launch
 
+// 保存滑动状态变量，使其跨重组保持
+private val SettingsScreenScrollPosition = mutableStateOf(0)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -26,6 +29,7 @@ fun SettingsScreen(
         navigateToModelConfig: () -> Unit,
         navigateToThemeSettings: () -> Unit,
         navigateToModelPrompts: () -> Unit,
+        navigateToFunctionalPrompts: () -> Unit,
         navigateToFunctionalConfig: () -> Unit,
         navigateToChatHistorySettings: () -> Unit,
         navigateToLanguageSettings: () -> Unit
@@ -33,6 +37,16 @@ fun SettingsScreen(
         val context = LocalContext.current
         val apiPreferences = remember { ApiPreferences(context) }
         val scope = rememberCoroutineScope()
+
+        // 创建和记住滚动状态，设置为上次保存的位置
+        val scrollState = rememberScrollState(SettingsScreenScrollPosition.value)
+
+        // 当滚动状态改变时更新保存的位置
+        LaunchedEffect(scrollState) {
+                snapshotFlow { scrollState.value }.collect { position ->
+                        SettingsScreenScrollPosition.value = position
+                }
+        }
 
         // Collect API settings as state
         val apiKey = apiPreferences.apiKeyFlow.collectAsState(initial = "").value
@@ -44,11 +58,6 @@ fun SettingsScreen(
         val modelName =
                 apiPreferences.modelNameFlow.collectAsState(
                                 initial = ApiPreferences.DEFAULT_MODEL_NAME
-                        )
-                        .value
-        val showThinking =
-                apiPreferences.showThinkingFlow.collectAsState(
-                                initial = ApiPreferences.DEFAULT_SHOW_THINKING
                         )
                         .value
         val memoryOptimization =
@@ -71,7 +80,6 @@ fun SettingsScreen(
         var apiKeyInput by remember { mutableStateOf(apiKey) }
         var apiEndpointInput by remember { mutableStateOf(apiEndpoint) }
         var modelNameInput by remember { mutableStateOf(modelName) }
-        var showThinkingInput by remember { mutableStateOf(showThinking) }
         var memoryOptimizationInput by remember { mutableStateOf(memoryOptimization) }
         var showFpsCounterInput by remember { mutableStateOf(showFpsCounter) }
         var autoGrantAccessibilityInput by remember { mutableStateOf(autoGrantAccessibility) }
@@ -100,7 +108,6 @@ fun SettingsScreen(
                 apiKey,
                 apiEndpoint,
                 modelName,
-                showThinking,
                 memoryOptimization,
                 showFpsCounter,
                 autoGrantAccessibility
@@ -108,7 +115,6 @@ fun SettingsScreen(
                 apiKeyInput = apiKey
                 apiEndpointInput = apiEndpoint
                 modelNameInput = modelName
-                showThinkingInput = showThinking
                 memoryOptimizationInput = memoryOptimization
                 showFpsCounterInput = showFpsCounter
                 autoGrantAccessibilityInput = autoGrantAccessibility
@@ -116,35 +122,79 @@ fun SettingsScreen(
 
         Column(
                 modifier =
-                        Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())
+                        Modifier.fillMaxSize()
+                                .padding(16.dp)
+                                .verticalScroll(scrollState) // 使用保存的滚动状态
         ) {
                 // ======= SECTION 1: PERSONALIZATION =======
-                SettingsSectionTitle(title = "个性化", icon = Icons.Default.Person)
+                SettingsSectionTitle(
+                        title = stringResource(id = R.string.settings_section_personalization),
+                        icon = Icons.Default.Person
+                )
 
                 // 用户偏好设置
                 SettingsCard(
-                        title = "用户偏好设置",
-                        description = "配置个人信息和偏好，让AI更好地了解你，包括年龄、性格、身份、职业和期待的AI风格",
+                        title = stringResource(id = R.string.settings_user_preferences),
+                        description = stringResource(id = R.string.settings_user_preferences_desc),
                         onClick = onNavigateToUserPreferences,
-                        buttonText = "配置用户偏好",
+                        buttonText = stringResource(id = R.string.settings_configure_preferences),
                         icon = Icons.Default.Face
                 )
 
+                // ======= SECTION 2: AI MODEL CONFIGURATION =======
+                SettingsSectionTitle(
+                        title = stringResource(id = R.string.settings_section_ai_model),
+                        icon = Icons.Default.Settings
+                )
+
+                // 模型与参数配置卡片
+                SettingsCard(
+                        title = stringResource(id = R.string.settings_model_parameters),
+                        description = stringResource(id = R.string.settings_model_parameters_desc),
+                        onClick = navigateToModelConfig,
+                        buttonText = stringResource(id = R.string.settings_configure_model),
+                        icon = Icons.Default.Api
+                )
+
+                // 功能模型配置卡片
+                SettingsCard(
+                        title = stringResource(id = R.string.settings_functional_model),
+                        description = stringResource(id = R.string.settings_functional_model_desc),
+                        onClick = navigateToFunctionalConfig,
+                        buttonText = stringResource(id = R.string.settings_configure_function),
+                        icon = Icons.Default.Tune
+                )
+
+                // ======= SECTION 3: PROMPT CONFIGURATION =======
+                SettingsSectionTitle(title = "提示词配置", icon = Icons.Default.Message)
+
                 // 模型提示词设置
                 SettingsCard(
-                        title = "模型提示词设置",
-                        description = "自定义AI助手的系统提示词，包括自我介绍和语气风格，使AI更符合您的预期",
+                        title = "提示词配置",
+                        description = "自定义AI助手的行为和性格的提示词",
                         onClick = navigateToModelPrompts,
                         buttonText = "配置提示词",
-                        icon = Icons.Default.Message
+                        icon = Icons.Default.ChatBubble
                 )
+
+                // 功能提示词配置卡片
+                SettingsCard(
+                        title = "功能提示词配置",
+                        description = "为不同功能（对话、语音、桌宠）设置专用的提示词",
+                        onClick = navigateToFunctionalPrompts,
+                        buttonText = "配置功能提示词",
+                        icon = Icons.Default.Settings
+                )
+
+                // ======= SECTION 4: APPEARANCE =======
+                SettingsSectionTitle(title = "外观设置", icon = Icons.Default.Palette)
 
                 // 主题设置
                 SettingsCard(
-                        title = "主题和外观",
-                        description = "个性化应用外观，包括深色/浅色模式和自定义配色方案",
+                        title = stringResource(id = R.string.settings_theme_appearance),
+                        description = stringResource(id = R.string.settings_theme_appearance_desc),
                         onClick = navigateToThemeSettings,
-                        buttonText = "自定义主题",
+                        buttonText = stringResource(id = R.string.settings_customize_theme),
                         icon = Icons.Default.Palette
                 )
 
@@ -159,36 +209,18 @@ fun SettingsScreen(
 
                 // 聊天记录管理
                 SettingsCard(
-                        title = "聊天记录管理",
-                        description = "导入、导出或删除聊天记录，方便备份和恢复重要对话",
+                        title = stringResource(id = R.string.settings_data_backup),
+                        description = stringResource(id = R.string.settings_data_backup_desc),
                         onClick = navigateToChatHistorySettings,
-                        buttonText = "管理聊天记录",
+                        buttonText = stringResource(id = R.string.settings_manage_backup),
                         icon = Icons.Default.History
                 )
 
-                // ======= SECTION 2: AI MODEL CONFIGURATION =======
-                SettingsSectionTitle(title = "AI模型配置", icon = Icons.Default.Settings)
-
-                // 模型与参数配置卡片
-                SettingsCard(
-                        title = "模型与参数配置",
-                        description = "配置API设置、模型名称与参数，支持多配置管理",
-                        onClick = navigateToModelConfig,
-                        buttonText = "配置模型",
-                        icon = Icons.Default.Api
+                // ======= SECTION 5: DISPLAY AND BEHAVIOR =======
+                SettingsSectionTitle(
+                        title = stringResource(id = R.string.settings_section_display),
+                        icon = Icons.Default.Visibility
                 )
-
-                // 功能模型配置卡片
-                SettingsCard(
-                        title = "功能模型配置",
-                        description = "为不同功能（如对话、总结、问题库等）配置专用的模型与API设置",
-                        onClick = navigateToFunctionalConfig,
-                        buttonText = "配置功能",
-                        icon = Icons.Default.Tune
-                )
-
-                // ======= SECTION 3: DISPLAY AND BEHAVIOR =======
-                SettingsSectionTitle(title = "显示与行为", icon = Icons.Default.Visibility)
 
                 Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -211,24 +243,18 @@ fun SettingsScreen(
                                         )
                                 }
 
-                                // 显示思考过程设置
-                                SettingsToggle(
-                                        title = "显示思考过程",
-                                        description = "启用或禁用在生成回应时显示思考过程，增强透明度与可信度",
-                                        checked = showThinkingInput,
-                                        onCheckedChange = {
-                                                showThinkingInput = it
-                                                scope.launch {
-                                                        apiPreferences.saveShowThinking(it)
-                                                        showSaveSuccessMessage = true
-                                                }
-                                        }
-                                )
-
                                 // 记忆优化开关
                                 SettingsToggle(
-                                        title = "记忆优化",
-                                        description = "开启后，AI会有一定的遗忘能力",
+                                        title =
+                                                stringResource(
+                                                        id = R.string.settings_memory_optimization
+                                                ),
+                                        description =
+                                                stringResource(
+                                                        id =
+                                                                R.string
+                                                                        .settings_memory_optimization_desc
+                                                ),
                                         checked = memoryOptimizationInput,
                                         onCheckedChange = {
                                                 memoryOptimizationInput = it
@@ -239,10 +265,34 @@ fun SettingsScreen(
                                         }
                                 )
 
+                                // 模型显示开关
+                                val showModelSelector =
+                                        apiPreferences.showModelSelectorFlow.collectAsState(
+                                                        initial =
+                                                                ApiPreferences
+                                                                        .DEFAULT_SHOW_MODEL_SELECTOR
+                                                )
+                                                .value
+                                SettingsToggle(
+                                        title = stringResource(R.string.model_selector_toggle),
+                                        description =
+                                                stringResource(R.string.model_selector_toggle_desc),
+                                        checked = showModelSelector,
+                                        onCheckedChange = {
+                                                scope.launch {
+                                                        apiPreferences.saveShowModelSelector(it)
+                                                        showSaveSuccessMessage = true
+                                                }
+                                        }
+                                )
+
                                 // 帧率显示开关
                                 SettingsToggle(
-                                        title = "显示帧率",
-                                        description = "在屏幕右上角显示实时帧率",
+                                        title = stringResource(id = R.string.show_fps_counter),
+                                        description =
+                                                stringResource(
+                                                        id = R.string.fps_counter_description
+                                                ),
                                         checked = showFpsCounterInput,
                                         onCheckedChange = {
                                                 showFpsCounterInput = it
@@ -255,8 +305,16 @@ fun SettingsScreen(
 
                                 // 自动授予无障碍权限开关
                                 SettingsToggle(
-                                        title = "自动授予无障碍权限",
-                                        description = "关闭后需每次打开软件手动授权",
+                                        title =
+                                                stringResource(
+                                                        id = R.string.settings_auto_accessibility
+                                                ),
+                                        description =
+                                                stringResource(
+                                                        id =
+                                                                R.string
+                                                                        .settings_auto_accessibility_desc
+                                                ),
                                         checked = autoGrantAccessibilityInput,
                                         onCheckedChange = {
                                                 autoGrantAccessibilityInput = it
@@ -271,20 +329,26 @@ fun SettingsScreen(
                         }
                 }
 
-                // ======= SECTION 4: PERMISSIONS AND SECURITY =======
-                SettingsSectionTitle(title = "权限与安全", icon = Icons.Default.Security)
+                // ======= SECTION 6: PERMISSIONS AND SECURITY =======
+                SettingsSectionTitle(
+                        title = stringResource(id = R.string.settings_section_permissions),
+                        icon = Icons.Default.Security
+                )
 
                 // 工具权限设置卡片
                 SettingsCard(
-                        title = "工具权限设置",
-                        description = "配置AI助手工具的权限级别，可以设置为自动允许、询问或禁止",
+                        title = stringResource(id = R.string.settings_tool_permissions),
+                        description = stringResource(id = R.string.settings_tool_permissions_desc),
                         onClick = navigateToToolPermissions,
-                        buttonText = "配置工具权限",
+                        buttonText = stringResource(id = R.string.settings_configure_permissions),
                         icon = Icons.Default.AdminPanelSettings
                 )
 
-                // ======= SECTION 5: USAGE STATISTICS =======
-                SettingsSectionTitle(title = "使用统计", icon = Icons.Default.Analytics)
+                // ======= SECTION 7: USAGE STATISTICS =======
+                SettingsSectionTitle(
+                        title = stringResource(id = R.string.settings_section_usage),
+                        icon = Icons.Default.Analytics
+                )
 
                 // Token统计卡片
                 Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
@@ -300,7 +364,12 @@ fun SettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                                text = "Token统计",
+                                                text =
+                                                        stringResource(
+                                                                id =
+                                                                        R.string
+                                                                                .settings_token_statistics
+                                                        ),
                                                 style = MaterialTheme.typography.titleMedium
                                         )
                                 }
@@ -360,26 +429,46 @@ fun SettingsScreen(
                                 // 统计信息表格
                                 Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                                         TokenStatRow(
-                                                label = "聊天输入Token",
+                                                label =
+                                                        stringResource(
+                                                                id =
+                                                                        R.string
+                                                                                .settings_chat_input_token
+                                                        ),
                                                 value = totalInputTokens.toString(),
                                                 cost = "¥${String.format("%.2f", chatInputCost)}"
                                         )
 
                                         TokenStatRow(
-                                                label = "聊天输出Token",
+                                                label =
+                                                        stringResource(
+                                                                id =
+                                                                        R.string
+                                                                                .settings_chat_output_token
+                                                        ),
                                                 value = totalOutputTokens.toString(),
                                                 cost = "¥${String.format("%.2f", chatOutputCost)}"
                                         )
 
                                         TokenStatRow(
-                                                label = "偏好分析输入Token",
+                                                label =
+                                                        stringResource(
+                                                                id =
+                                                                        R.string
+                                                                                .settings_preference_input_token
+                                                        ),
                                                 value = preferenceAnalysisInputTokens.toString(),
                                                 cost =
                                                         "¥${String.format("%.2f", preferenceAnalysisInputCost)}"
                                         )
 
                                         TokenStatRow(
-                                                label = "偏好分析输出Token",
+                                                label =
+                                                        stringResource(
+                                                                id =
+                                                                        R.string
+                                                                                .settings_preference_output_token
+                                                        ),
                                                 value = preferenceAnalysisOutputTokens.toString(),
                                                 cost =
                                                         "¥${String.format("%.2f", preferenceAnalysisOutputCost)}"
@@ -388,7 +477,10 @@ fun SettingsScreen(
                                         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
                                         TokenStatRow(
-                                                label = "总计",
+                                                label =
+                                                        stringResource(
+                                                                id = R.string.settings_total
+                                                        ),
                                                 value =
                                                         (totalInputTokens +
                                                                         totalOutputTokens +
@@ -413,7 +505,15 @@ fun SettingsScreen(
                                                                 showSaveSuccessMessage = true
                                                         }
                                                 }
-                                        ) { Text("重置偏好分析计数") }
+                                        ) {
+                                                Text(
+                                                        stringResource(
+                                                                id =
+                                                                        R.string
+                                                                                .settings_reset_analysis_count
+                                                        )
+                                                )
+                                        }
                                 }
 
                                 // 幽默解释
@@ -430,7 +530,12 @@ fun SettingsScreen(
                                 ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
                                                 Text(
-                                                        text = "为什么我要关心Token统计？",
+                                                        text =
+                                                                stringResource(
+                                                                        id =
+                                                                                R.string
+                                                                                        .settings_why_token_stats
+                                                                ),
                                                         style =
                                                                 MaterialTheme.typography.bodyMedium
                                                                         .copy(
@@ -443,7 +548,11 @@ fun SettingsScreen(
 
                                                 Text(
                                                         text =
-                                                                "因为它就像一个饭店账单，只不过这里的'饭'是AI的思考，而'钱'是以人民币计算的！偏好分析是AI暗中观察你的口味，为你定制下次的\"菜单\"。别担心，即使你聊到手指抽筋，这些费用可能还不够买一杯奶茶～",
+                                                                stringResource(
+                                                                        id =
+                                                                                R.string
+                                                                                        .settings_token_stats_explanation
+                                                                ),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color =
                                                                 MaterialTheme.colorScheme
@@ -561,7 +670,6 @@ private fun TokenStatRow(
 ) {
         Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
         ) {
                 Text(
@@ -569,10 +677,13 @@ private fun TokenStatRow(
                         style = MaterialTheme.typography.bodyMedium,
                         color =
                                 if (isHighlighted) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(0.6f), // 限制文本宽度为60%
+                        maxLines = 2, // 允许最多两行
+                        softWrap = true // 允许换行
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(modifier = Modifier.weight(0.4f), horizontalArrangement = Arrangement.End) {
                         Text(
                                 text = value,
                                 style =
@@ -583,8 +694,11 @@ private fun TokenStatRow(
                                         ),
                                 color =
                                         if (isHighlighted) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.width(IntrinsicSize.Min)
                         )
+
+                        Spacer(modifier = Modifier.width(16.dp))
 
                         Text(
                                 text = cost,
