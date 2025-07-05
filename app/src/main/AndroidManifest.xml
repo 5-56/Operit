@@ -48,6 +48,30 @@
     <!-- 在<uses-permission>部分添加语音识别所需权限 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
+    <!-- 视频通话相关权限 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    
+    <!-- 蓝牙音频设备权限 -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    
+    <!-- 硬件特性要求 -->
+    <uses-feature 
+        android:name="android.hardware.camera" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.camera.front" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.microphone" 
+        android:required="true" />
+    <uses-feature 
+        android:name="android.hardware.audio.output" 
+        android:required="true" />
+    
     <!-- AuraFlow Agent 权限 -->
     <!-- 媒体投影权限 -->
     <uses-permission android:name="android.permission.MEDIA_PROJECTION" />
@@ -168,6 +192,17 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync|specialUse|microphone" />
+            
+        <!-- 实时语音视频服务 -->
+        <service
+            android:name=".service.RealTimeVoiceVideoService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="实时语音视频通话处理" />
+        </service>
 
         <!-- AI 前台服务 - 保持网络连接稳定 -->
         <service

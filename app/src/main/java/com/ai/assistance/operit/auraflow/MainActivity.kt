@@ -30,12 +30,15 @@ import com.ai.assistance.operit.auraflow.permission.*
 import com.ai.assistance.operit.auraflow.service.FloatingWindowService
 import com.ai.assistance.operit.auraflow.config.ConfigurationManager
 import com.ai.assistance.operit.auraflow.performance.PerformanceManager
+import com.ai.assistance.operit.auraflow.voice.RealTimeVoiceManager
+import com.ai.assistance.operit.auraflow.video.VideoCallManager
 import com.ai.assistance.operit.auraflow.ui.chat.AIChatScreen
 import com.ai.assistance.operit.auraflow.ui.config.AIBrainConfigScreen
 import com.ai.assistance.operit.auraflow.ui.permission.PermissionCheckScreen
 import com.ai.assistance.operit.auraflow.ui.toolbox.ToolboxScreen
 import com.ai.assistance.operit.auraflow.ui.toolbox.UIDebugToolScreen
 import com.ai.assistance.operit.auraflow.ui.toolbox.CommandExecutorScreen
+import com.ai.assistance.operit.auraflow.ui.voice.VoiceChatScreen
 import com.ai.assistance.operit.auraflow.ui.theme.AuraFlowTheme
 import kotlinx.coroutines.launch
 
@@ -53,6 +56,7 @@ enum class NavigationDestination(
     
     // 主要页面
     CHAT("chat", "AI对话", Icons.Default.Psychology, Icons.Filled.Psychology),
+    VOICE_CHAT("voice_chat", "语音对话", Icons.Default.Mic, Icons.Filled.Mic),
     CONFIG("config", "配置", Icons.Default.Settings, Icons.Filled.Settings),
     TOOLBOX("toolbox", "工具箱", Icons.Default.Construction, Icons.Filled.Construction),
     
@@ -75,6 +79,8 @@ class MainActivity : ComponentActivity() {
     // 全局管理器实例
     private lateinit var configurationManager: ConfigurationManager
     private lateinit var performanceManager: PerformanceManager
+    private lateinit var realTimeVoiceManager: RealTimeVoiceManager
+    private lateinit var videoCallManager: VideoCallManager
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -107,6 +113,27 @@ class MainActivity : ComponentActivity() {
         // 初始化性能管理器
         performanceManager = PerformanceManager.getInstance(this)
         Log.d(TAG, "性能管理器初始化完成")
+        
+        // 初始化实时语音管理器
+        realTimeVoiceManager = RealTimeVoiceManager(this)
+        Log.d(TAG, "实时语音管理器创建完成")
+        
+        // 初始化视频通话管理器
+        videoCallManager = VideoCallManager(this)
+        Log.d(TAG, "视频通话管理器创建完成")
+        
+        // 异步初始化语音和视频管理器
+        lifecycleScope.launch {
+            try {
+                val voiceSuccess = realTimeVoiceManager.initialize()
+                Log.d(TAG, "实时语音管理器初始化${if (voiceSuccess) "成功" else "失败"}")
+                
+                val videoSuccess = videoCallManager.initialize()
+                Log.d(TAG, "视频通话管理器初始化${if (videoSuccess) "成功" else "失败"}")
+            } catch (e: Exception) {
+                Log.e(TAG, "初始化语音/视频管理器失败", e)
+            }
+        }
         
         // 观察配置变化
         lifecycleScope.launch {
@@ -172,6 +199,14 @@ class MainActivity : ComponentActivity() {
             performanceManager.cleanup()
         }
         
+        if (::realTimeVoiceManager.isInitialized) {
+            realTimeVoiceManager.cleanup()
+        }
+        
+        if (::videoCallManager.isInitialized) {
+            videoCallManager.cleanup()
+        }
+        
         // 配置管理器不需要手动清理，因为它使用ApplicationContext
     }
 }
@@ -205,6 +240,7 @@ fun AuraFlowApp() {
     // 主界面导航项
     val mainDestinations = listOf(
         NavigationDestination.CHAT,
+        NavigationDestination.VOICE_CHAT,
         NavigationDestination.CONFIG,
         NavigationDestination.TOOLBOX
     )
@@ -291,6 +327,15 @@ fun AuraFlowApp() {
                         scope.launch {
                             openFloatingWindow(context)
                         }
+                    }
+                )
+            }
+            
+            // 语音聊天页面
+            composable(NavigationDestination.VOICE_CHAT.route) {
+                VoiceChatScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }

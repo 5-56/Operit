@@ -144,6 +144,29 @@ dependencies {
     // Window metrics library for foldables and adaptive layouts
     implementation("androidx.window:window:1.1.0")
     
+    // CameraX dependencies for video calling
+    implementation("androidx.camera:camera-core:1.3.1")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-video:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+    implementation("androidx.camera:camera-extensions:1.3.1")
+    
+    // Media3 dependencies for audio/video processing
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
+    implementation("androidx.media3:media3-common:1.2.1")
+    
+    // Speech recognition and TTS
+    implementation("androidx.speech:speech-ktx:1.0.0-alpha03")
+    
+    // WebRTC for real-time communication
+    implementation("org.webrtc:google-webrtc:1.0.32006")
+    
+    // Audio processing libraries
+    implementation("com.github.yausername.youtubedl-android:library:0.14.1")
+    implementation("com.github.yausername.youtubedl-android:ffmpeg:0.14.1")
+    
     // Document conversion libraries
     implementation("com.itextpdf:itextpdf:5.5.13.3") // iText for PDF creation
     implementation("org.apache.pdfbox:pdfbox:2.0.27") // PDFBox for PDF operations
