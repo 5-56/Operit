@@ -12,7 +12,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import android.util.Log
+import com.ai.assistance.operit.util.LogUtils
 import android.view.View
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
@@ -99,7 +99,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     private fun handleServiceCrash(thread: Thread, throwable: Throwable) {
         try {
-            Log.e(TAG, "Service crashed: ${throwable.message}", throwable)
+            LogUtils.e(TAG, "Service crashed: ${throwable.message}", throwable)
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastCrashTime > 60000) {
                 crashCount = 0
@@ -108,7 +108,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             crashCount++
 
             if (crashCount > 3) {
-                Log.e(TAG, "Too many crashes in short time, stopping service")
+                LogUtils.e(TAG, "Too many crashes in short time, stopping service")
                 prefs.edit().putBoolean("service_disabled_due_to_crashes", true).apply()
                 stopSelf()
                 return
@@ -119,7 +119,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             intent.setPackage(packageName)
             startService(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling crash", e)
+            LogUtils.e(TAG, "Error handling crash", e)
         } finally {
             defaultExceptionHandler?.uncaughtException(thread, throwable)
         }
@@ -127,13 +127,13 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "onCreate")
+        LogUtils.d(TAG, "onCreate")
 
         Thread.setDefaultUncaughtExceptionHandler(customExceptionHandler)
 
         prefs = getSharedPreferences("floating_chat_prefs", Context.MODE_PRIVATE)
         if (prefs.getBoolean("service_disabled_due_to_crashes", false)) {
-            Log.w(TAG, "Service was disabled due to frequent crashes")
+            LogUtils.w(TAG, "Service was disabled due to frequent crashes")
             stopSelf()
             return
         }
@@ -157,7 +157,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             createNotificationChannel()
             startForeground(NOTIFICATION_ID, createNotification())
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onCreate", e)
+            LogUtils.e(TAG, "Error in onCreate", e)
             stopSelf()
         }
     }
@@ -175,10 +175,10 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             }
             if (wakeLock?.isHeld == false) {
                 wakeLock?.acquire(10 * 60 * 1000L)
-                Log.d(TAG, "WakeLock acquired")
+                LogUtils.d(TAG, "WakeLock acquired")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error acquiring WakeLock", e)
+            LogUtils.e(TAG, "Error acquiring WakeLock", e)
         }
     }
 
@@ -186,10 +186,10 @@ class FloatingChatService : Service(), FloatingWindowCallback {
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()
-                Log.d(TAG, "WakeLock released")
+                LogUtils.d(TAG, "WakeLock released")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error releasing WakeLock", e)
+            LogUtils.e(TAG, "Error releasing WakeLock", e)
         }
     }
 
@@ -231,7 +231,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand")
+        LogUtils.d(TAG, "onStartCommand")
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
 
@@ -243,9 +243,9 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                 try {
                     val mode = FloatingMode.valueOf(modeName)
                     windowState.currentMode.value = mode
-                    Log.d(TAG, "Set mode from intent: $mode")
+                    LogUtils.d(TAG, "Set mode from intent: $mode")
                 } catch (e: IllegalArgumentException) {
-                    Log.w(TAG, "Invalid mode name in intent: $modeName")
+                    LogUtils.w(TAG, "Invalid mode name in intent: $modeName")
                 }
             }
 
@@ -285,14 +285,14 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             }
             windowManager.show()
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onStartCommand", e)
+            LogUtils.e(TAG, "Error in onStartCommand", e)
         }
         return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent) {
         super.onTaskRemoved(rootIntent)
-        Log.d(TAG, "onTaskRemoved")
+        LogUtils.d(TAG, "onTaskRemoved")
         val restartServiceIntent =
                 Intent(applicationContext, this.javaClass).apply { setPackage(packageName) }
         startService(restartServiceIntent)
@@ -300,13 +300,13 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        Log.d(TAG, "onLowMemory: 系统内存不足")
+        LogUtils.d(TAG, "onLowMemory: 系统内存不足")
         saveState()
     }
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        Log.d(TAG, "onTrimMemory: level=$level")
+        LogUtils.d(TAG, "onTrimMemory: level=$level")
         if (level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
                         level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
                         level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
@@ -317,12 +317,12 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     }
 
     private fun handleAttachmentRequest(request: String) {
-        Log.d(TAG, "Attachment request received: $request")
+        LogUtils.d(TAG, "Attachment request received: $request")
         serviceScope.launch {
             try {
                 _attachmentRequest.emit(request)
             } catch (e: Exception) {
-                Log.e(TAG, "Error handling attachment request", e)
+                LogUtils.e(TAG, "Error handling attachment request", e)
             }
         }
     }
@@ -332,9 +332,9 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             try {
                 attachments.value = attachments.value.filterNot { it.filePath == filePath }
                 _attachmentRemoveRequest.emit(filePath)
-                Log.d(TAG, "Attachment removed: $filePath, remaining: ${attachments.value.size}")
+                LogUtils.d(TAG, "Attachment removed: $filePath, remaining: ${attachments.value.size}")
             } catch (e: Exception) {
-                Log.e(TAG, "Error removing attachment", e)
+                LogUtils.e(TAG, "Error removing attachment", e)
             }
         }
     }
@@ -345,7 +345,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     fun updateChatMessages(messages: List<ChatMessage>) {
         serviceScope.launch {
-            Log.d(
+            LogUtils.d(
                     TAG,
                     "服务收到消息更新: ${messages.size} 条. 最后一条消息的 stream is null: ${messages.lastOrNull()?.contentStream == null}"
             )
@@ -360,7 +360,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             serviceScope.cancel()
             saveState()
             super.onDestroy()
-            Log.d(TAG, "onDestroy")
+            LogUtils.d(TAG, "onDestroy")
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
@@ -368,12 +368,12 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             Thread.setDefaultUncaughtExceptionHandler(defaultExceptionHandler)
             prefs.edit().putInt("view_creation_retry", 0).apply()
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onDestroy", e)
+            LogUtils.e(TAG, "Error in onDestroy", e)
         }
     }
 
     override fun onClose() {
-        Log.d(TAG, "Close request from window manager")
+        LogUtils.d(TAG, "Close request from window manager")
         binder.notifyClose()
         stopSelf()
     }
@@ -420,6 +420,6 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     fun switchToMode(mode: FloatingMode) {
         windowState.currentMode.value = mode
-        Log.d(TAG, "Switching to mode: $mode")
+        LogUtils.d(TAG, "Switching to mode: $mode")
     }
 }

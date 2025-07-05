@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.core.tools.calculator
 
+import com.ai.assistance.operit.util.LogUtils
+
 /**
  * 计算器测试类
  *
@@ -7,6 +9,8 @@ package com.ai.assistance.operit.core.tools.calculator
  */
 class CalculatorTest {
     companion object {
+        private const val TAG = "CalculatorTest"
+        
         /** 运行测试示例 */
         fun runTests() {
             // 基本算术
@@ -35,7 +39,7 @@ class CalculatorTest {
             // 清理
             JsCalculator.clearVariables()
 
-            println("所有测试完成!")
+            LogUtils.i(TAG, "所有测试完成!")
         }
 
         /** 测试单个表达式 */
@@ -43,13 +47,12 @@ class CalculatorTest {
             try {
                 val result = JsCalculator.calc(expression)
                 if (result == expected) {
-                    println("测试通过: $expression = $result")
+                    LogUtils.i(TAG, "测试通过: $expression = $result")
                 } else {
-                    println("测试失败: $expression = $result, 期望值: $expected")
+                    LogUtils.w(TAG, "测试失败: $expression = $result, 期望值: $expected")
                 }
             } catch (e: Exception) {
-                println("测试出错: $expression, 错误: ${e.message}")
-                e.printStackTrace()
+                LogUtils.e(TAG, "测试出错: $expression, 错误: ${e.message}", e)
             }
         }
 

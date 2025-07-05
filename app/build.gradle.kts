@@ -30,13 +30,32 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
+            
+            // 性能优化
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
+        }
+        
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            
+            // 调试时保持符号
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
     compileOptions {

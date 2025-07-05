@@ -1,7 +1,7 @@
 package com.ai.assistance.operit.util
 
 import android.content.Context
-import android.util.Log
+import com.ai.assistance.operit.util.LogUtils
 import com.ai.assistance.operit.api.chat.library.ProblemLibraryTool
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.db.ProblemEntity
@@ -215,9 +215,9 @@ class VectorDatabaseHelper(private val context: Context) {
                 saveIndexAsync()
             }
 
-            Log.d(TAG, "向量索引添加成功: ${record.uuid}, 当前索引大小: ${index.size()}")
+            LogUtils.d(TAG, "向量索引添加成功: ${record.uuid}, 当前索引大小: ${index.size()}")
         } catch (e: Exception) {
-            Log.e(TAG, "向量索引添加失败: ${e.message}")
+            LogUtils.e(TAG, "向量索引添加失败: ${e.message}")
         }
     }
 
@@ -227,31 +227,31 @@ class VectorDatabaseHelper(private val context: Context) {
             maxResults: Int = 10
     ): List<ProblemLibraryTool.ProblemRecord> {
         try {
-            Log.d(TAG, "开始向量搜索: '$query', 最大结果数: $maxResults, 当前索引大小: ${index.size()}")
+            LogUtils.d(TAG, "开始向量搜索: '$query', 最大结果数: $maxResults, 当前索引大小: ${index.size()}")
 
             if (index.size() == 0) {
-                Log.w(TAG, "向量索引为空，尝试构建索引...")
+                LogUtils.w(TAG, "向量索引为空，尝试构建索引...")
                 buildIndexFromDatabase()
 
                 if (index.size() == 0) {
-                    Log.e(TAG, "构建索引后仍为空，可能数据库中没有记录")
+                    LogUtils.e(TAG, "构建索引后仍为空，可能数据库中没有记录")
                     return emptyList()
                 }
             }
 
             val queryVector = textToSimpleVector(query)
-            Log.d(TAG, "生成查询向量成功")
+            LogUtils.d(TAG, "生成查询向量成功")
 
             val results = index.findNearest(queryVector, maxResults)
-            Log.d(TAG, "找到 ${results.size} 条相似结果")
+            LogUtils.d(TAG, "找到 ${results.size} 条相似结果")
 
             // 获取相似记录的UUID列表
             val uuids = results.map { it.item().id() }
-            Log.d(TAG, "获取到的UUID列表: $uuids")
+            LogUtils.d(TAG, "获取到的UUID列表: $uuids")
 
             // 从数据库中获取完整记录
             val entities = problemDao.getProblemsByIds(uuids)
-            Log.d(TAG, "从数据库检索到 ${entities.size} 条记录")
+            LogUtils.d(TAG, "从数据库检索到 ${entities.size} 条记录")
 
             // 转换为ProblemRecord并保持原搜索结果的顺序
             val idToEntityMap = entities.associateBy { it.uuid }
@@ -259,15 +259,15 @@ class VectorDatabaseHelper(private val context: Context) {
                     uuids.mapNotNull { uuid ->
                         val entity = idToEntityMap[uuid]
                         if (entity == null) {
-                            Log.w(TAG, "数据库中找不到UUID: $uuid")
+                            LogUtils.w(TAG, "数据库中找不到UUID: $uuid")
                         }
                         entity?.toProblemRecord()
                     }
 
-            Log.d(TAG, "最终返回 ${finalResults.size} 条搜索结果")
+            LogUtils.d(TAG, "最终返回 ${finalResults.size} 条搜索结果")
             return finalResults
         } catch (e: Exception) {
-            Log.e(TAG, "向量搜索失败: ${e.message}", e)
+            LogUtils.e(TAG, "向量搜索失败: ${e.message}", e)
             return emptyList()
         }
     }
@@ -288,9 +288,9 @@ class VectorDatabaseHelper(private val context: Context) {
                 oos.writeObject(vectorMap)
             }
 
-            Log.d(TAG, "向量索引保存成功，条目数: ${index.size()}")
+            LogUtils.d(TAG, "向量索引保存成功，条目数: ${index.size()}")
         } catch (e: Exception) {
-            Log.e(TAG, "向量索引保存失败: ${e.message}")
+            LogUtils.e(TAG, "向量索引保存失败: ${e.message}")
         }
     }
 
@@ -300,7 +300,7 @@ class VectorDatabaseHelper(private val context: Context) {
             val indexFile = File(context.filesDir, INDEX_FILENAME)
 
             if (!indexFile.exists()) {
-                Log.d(TAG, "向量索引文件不存在，使用新索引")
+                LogUtils.d(TAG, "向量索引文件不存在，使用新索引")
                 return false
             }
 
@@ -313,10 +313,10 @@ class VectorDatabaseHelper(private val context: Context) {
                 vectorMap.forEach { (id, vector) -> index.add(ProblemItem(id, vector)) }
             }
 
-            Log.d(TAG, "向量索引加载成功，条目数: ${index.size()}")
+            LogUtils.d(TAG, "向量索引加载成功，条目数: ${index.size()}")
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "向量索引加载失败: ${e.message}")
+            LogUtils.e(TAG, "向量索引加载失败: ${e.message}")
             return false
         }
     }
@@ -324,7 +324,7 @@ class VectorDatabaseHelper(private val context: Context) {
     // 从Room数据库构建索引
     suspend fun buildIndexFromDatabase() {
         try {
-            Log.d(TAG, "从数据库开始构建向量索引")
+            LogUtils.d(TAG, "从数据库开始构建向量索引")
 
             // 清空当前索引
             val currentItems = index.items().toList()
@@ -374,9 +374,9 @@ class VectorDatabaseHelper(private val context: Context) {
             // 保存索引
             saveIndex()
 
-            Log.d(TAG, "向量索引构建完成，索引大小: ${index.size()}")
+            LogUtils.d(TAG, "向量索引构建完成，索引大小: ${index.size()}")
         } catch (e: Exception) {
-            Log.e(TAG, "向量索引构建失败: ${e.message}")
+            LogUtils.e(TAG, "向量索引构建失败: ${e.message}")
         }
     }
 
@@ -386,7 +386,7 @@ class VectorDatabaseHelper(private val context: Context) {
             saveIndex()
             executorService.shutdown()
         } catch (e: Exception) {
-            Log.e(TAG, "释放资源失败: ${e.message}")
+            LogUtils.e(TAG, "释放资源失败: ${e.message}")
         }
     }
 }

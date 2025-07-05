@@ -6,7 +6,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.LocaleList
-import android.util.Log
+import com.ai.assistance.operit.util.LogUtils
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -86,12 +86,12 @@ class MainActivity : ComponentActivity() {
         // 使用createConfigurationContext创建新的本地化上下文
         val context = newBase.createConfigurationContext(config)
         super.attachBaseContext(context)
-        Log.d(TAG, "MainActivity应用语言设置: $code")
+        LogUtils.d(TAG, "MainActivity应用语言设置: $code")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "onCreate: Android SDK version: ${Build.VERSION.SDK_INT}")
+        LogUtils.d(TAG, "onCreate: Android SDK version: ${Build.VERSION.SDK_INT}")
 
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
 
         // 设置跳过加载的回调
         pluginLoadingState.setOnSkipCallback {
-            Log.d(TAG, "用户跳过了插件加载过程")
+            LogUtils.d(TAG, "用户跳过了插件加载过程")
             Toast.makeText(this, "已跳过插件加载", Toast.LENGTH_SHORT).show()
         }
 
@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
             if (!showPermissionGuide && agreementPreferences.isAgreementAccepted()) {
                 try {
                     val needsMigration = migrationManager.needsMigration()
-                    Log.d(TAG, "数据迁移检查: 需要迁移=$needsMigration")
+                    LogUtils.d(TAG, "数据迁移检查: 需要迁移=$needsMigration")
 
                     showMigrationScreen = needsMigration
 
@@ -165,7 +165,7 @@ class MainActivity : ComponentActivity() {
                         startPluginLoading()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "数据迁移检查失败", e)
+                    LogUtils.e(TAG, "数据迁移检查失败", e)
                     // 检查失败，跳过迁移直接加载插件
                     startPluginLoading()
                 }
@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
             try {
                 // 检查是否需要迁移数据
                 val needsMigration = migrationManager.needsMigration()
-                Log.d(TAG, "数据迁移检查: 需要迁移=$needsMigration")
+                LogUtils.d(TAG, "数据迁移检查: 需要迁移=$needsMigration")
 
                 if (needsMigration) {
                     showMigrationScreen = true
@@ -195,7 +195,7 @@ class MainActivity : ComponentActivity() {
                     startPluginLoading()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "数据迁移检查失败", e)
+                LogUtils.e(TAG, "数据迁移检查失败", e)
                 // 检查失败，跳过迁移直接加载插件
                 startPluginLoading()
             }
@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "onResume called")
+        LogUtils.d(TAG, "onResume called")
 
         // 清理临时文件目录
         cleanTemporaryFiles()
@@ -245,7 +245,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "onDestroy called")
+        LogUtils.d(TAG, "onDestroy called")
 
         // 清理临时文件目录
         cleanTemporaryFiles()
@@ -256,7 +256,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        Log.d(TAG, "onConfigurationChanged: orientation=${newConfig.orientation}")
+        LogUtils.d(TAG, "onConfigurationChanged: orientation=${newConfig.orientation}")
 
         // 屏幕方向变化时，确保加载界面不可见
         pluginLoadingState.hide()
@@ -271,7 +271,7 @@ class MainActivity : ComponentActivity() {
         // 初始化用户偏好管理器并直接检查初始化状态
         preferencesManager = UserPreferencesManager(this)
         showPreferencesGuide = !preferencesManager.isPreferencesInitialized()
-        Log.d(
+        LogUtils.d(
                 TAG,
                 "初始化检查: 用户偏好已初始化=${!showPreferencesGuide}，将${if(showPreferencesGuide) "" else "不"}显示引导界面"
         )
@@ -287,9 +287,9 @@ class MainActivity : ComponentActivity() {
     private fun checkPermissionLevelSet() {
         // 检查是否已设置权限级别
         val permissionLevel = androidPermissionPreferences.getPreferredPermissionLevel()
-        Log.d(TAG, "当前权限级别: $permissionLevel")
+        LogUtils.d(TAG, "当前权限级别: $permissionLevel")
         showPermissionGuide = permissionLevel == null
-        Log.d(
+        LogUtils.d(
                 TAG,
                 "权限级别检查: 已设置=${!showPermissionGuide}, 将${if(showPermissionGuide) "" else "不"}显示权限引导界面"
         )
@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity() {
                 // 只有当状态变化时才更新UI
                 val newValue = !profile.isInitialized
                 if (showPreferencesGuide != newValue) {
-                    Log.d(TAG, "偏好变更: 从 $showPreferencesGuide 变为 $newValue")
+                    LogUtils.d(TAG, "偏好变更: 从 $showPreferencesGuide 变为 $newValue")
                     showPreferencesGuide = newValue
                     setAppContent()
                 }
@@ -318,10 +318,10 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
                 window.setSustainedPerformanceMode(true)
-                Log.d(TAG, "已成功请求持续高性能模式。")
+                LogUtils.d(TAG, "已成功请求持续高性能模式。")
             } catch (e: Exception) {
                 // 在某些设备上，此模式可能不可用或不支持。
-                Log.w(TAG, "请求持续高性能模式失败。", e)
+                LogUtils.w(TAG, "请求持续高性能模式失败。", e)
             }
         }
 
@@ -332,14 +332,14 @@ class MainActivity : ComponentActivity() {
             val highestMode = getHighestRefreshRate()
             if (highestMode > 0) {
                 window.attributes.preferredDisplayModeId = highestMode
-                Log.d(TAG, "设置窗口首选显示模式ID: $highestMode")
+                LogUtils.d(TAG, "设置窗口首选显示模式ID: $highestMode")
             }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // 为Android 6.0-10设备优化高刷新率
             val refreshRate = getDeviceRefreshRate()
             if (refreshRate > 60f) {
                 window.attributes.preferredRefreshRate = refreshRate
-                Log.d(TAG, "设置窗口首选刷新率: $refreshRate Hz")
+                LogUtils.d(TAG, "设置窗口首选刷新率: $refreshRate Hz")
             }
         }
 
@@ -460,7 +460,7 @@ class MainActivity : ComponentActivity() {
                 updateManager.checkForUpdates(appVersion)
                 // 不需要显式处理更新状态，因为我们已经设置了观察者
             } catch (e: Exception) {
-                Log.e(TAG, "更新检查失败: ${e.message}")
+                LogUtils.e(TAG, "更新检查失败: ${e.message}")
             }
         }
     }
@@ -473,7 +473,7 @@ class MainActivity : ComponentActivity() {
                     "未知"
                 }
 
-        Log.d(TAG, "发现新版本: ${updateInfo.newVersion}，当前版本: $currentVersion")
+        LogUtils.d(TAG, "发现新版本: ${updateInfo.newVersion}，当前版本: $currentVersion")
 
         // 显示更新提示
         val updateMessage = "发现新版本 ${updateInfo.newVersion}，请前往「关于」页面查看详情"
@@ -492,37 +492,46 @@ class MainActivity : ComponentActivity() {
                     highestModeId = mode.modeId
                 }
             }
-            Log.d(TAG, "Selected display mode with refresh rate: $maxRefreshRate Hz")
+            LogUtils.d(TAG, "Selected display mode with refresh rate: $maxRefreshRate Hz")
             return highestModeId
         }
         return 0
     }
 
     private fun getDeviceRefreshRate(): Float {
-        val windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
-        val display =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    display
-                } else {
-                    @Suppress("DEPRECATION") windowManager.defaultDisplay
-                }
-
         var refreshRate = 60f // Default refresh rate
 
-        if (display != null) {
-            try {
-                @Suppress("DEPRECATION") val modes = display.supportedModes
-                for (mode in modes) {
-                    if (mode.refreshRate > refreshRate) {
-                        refreshRate = mode.refreshRate
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // 使用新的API获取显示信息
+                display?.supportedModes?.let { modes ->
+                    for (mode in modes) {
+                        if (mode.refreshRate > refreshRate) {
+                            refreshRate = mode.refreshRate
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error getting refresh rate", e)
+            } else {
+                // 对于较旧的API版本，使用兼容性方法
+                val windowManager = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
+                @Suppress("DEPRECATION") 
+                val defaultDisplay = windowManager.defaultDisplay
+                
+                if (defaultDisplay != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    @Suppress("DEPRECATION") 
+                    val modes = defaultDisplay.supportedModes
+                    for (mode in modes) {
+                        if (mode.refreshRate > refreshRate) {
+                            refreshRate = mode.refreshRate
+                        }
+                    }
+                }
             }
+        } catch (e: Exception) {
+            LogUtils.e(TAG, "Error getting refresh rate", e)
         }
 
-        Log.d(TAG, "Selected refresh rate: $refreshRate Hz")
+        LogUtils.d(TAG, "Selected refresh rate: $refreshRate Hz")
         return refreshRate
     }
 
@@ -532,7 +541,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val tempDir = java.io.File("/sdcard/Download/Operit/cleanOnExit")
                 if (tempDir.exists() && tempDir.isDirectory) {
-                    Log.d(TAG, "开始清理临时文件目录: ${tempDir.absolutePath}")
+                    LogUtils.d(TAG, "开始清理临时文件目录: ${tempDir.absolutePath}")
                     val files = tempDir.listFiles()
                     var deletedCount = 0
 
@@ -542,10 +551,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    Log.d(TAG, "已删除${deletedCount}个临时文件")
+                    LogUtils.d(TAG, "已删除${deletedCount}个临时文件")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "清理临时文件失败", e)
+                LogUtils.e(TAG, "清理临时文件失败", e)
             }
         }
     }

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.dragonbones.DragonBonesModel
 import com.ai.assistance.operit.ui.components.ManagedDragonBonesView
 import com.ai.assistance.operit.ui.features.assistant.viewmodel.AssistantConfigViewModel
+import com.ai.assistance.operit.util.LogUtils
 import java.io.File
 import kotlinx.coroutines.delay
 
@@ -101,7 +102,7 @@ fun DragonBonesPreviewSection(
                                         modifier = Modifier.fillMaxSize(),
                                         model = model,
                                         controller = controller,
-                                        onError = { error -> println("DragonBones error: $error") }
+                                        onError = { error -> LogUtils.e("DragonBonesPreview", "DragonBones error: $error") }
                                 )
                         } else {
                                 Text(
