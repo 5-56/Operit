@@ -28,6 +28,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ai.assistance.operit.auraflow.permission.*
 import com.ai.assistance.operit.auraflow.service.FloatingWindowService
+import com.ai.assistance.operit.auraflow.config.ConfigurationManager
+import com.ai.assistance.operit.auraflow.performance.PerformanceManager
 import com.ai.assistance.operit.auraflow.ui.chat.AIChatScreen
 import com.ai.assistance.operit.auraflow.ui.config.AIBrainConfigScreen
 import com.ai.assistance.operit.auraflow.ui.permission.PermissionCheckScreen
@@ -70,19 +72,77 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
     }
     
+    // 全局管理器实例
+    private lateinit var configurationManager: ConfigurationManager
+    private lateinit var performanceManager: PerformanceManager
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
         Log.d(TAG, "MainActivity 创建")
         
-        // 初始化权限管理器
-        val permissionManager = PermissionManager.getInstance()
-        permissionManager.initializeInActivity(this)
+        // 初始化管理器
+        initializeManagers()
         
         setContent {
             AuraFlowTheme {
                 AuraFlowApp()
+            }
+        }
+    }
+    
+    /**
+     * 初始化各种管理器
+     */
+    private fun initializeManagers() {
+        // 初始化权限管理器
+        val permissionManager = PermissionManager.getInstance()
+        permissionManager.initializeInActivity(this)
+        
+        // 初始化配置管理器
+        configurationManager = ConfigurationManager.getInstance(this)
+        Log.d(TAG, "配置管理器初始化完成")
+        
+        // 初始化性能管理器
+        performanceManager = PerformanceManager.getInstance(this)
+        Log.d(TAG, "性能管理器初始化完成")
+        
+        // 观察配置变化
+        lifecycleScope.launch {
+            configurationManager.configuration.collect { config ->
+                Log.d(TAG, "配置已更新: ${config.version}")
+                // 应用配置变化
+                applyConfiguration(config)
+            }
+        }
+        
+        // 观察性能状态
+        lifecycleScope.launch {
+            performanceManager.performanceStats.collect { stats ->
+                if (stats != null) {
+                    Log.d(TAG, "性能统计更新: 内存${stats.memoryUsage.memoryPressure}, 电池${stats.batteryInfo.level}%")
+                }
+            }
+        }
+    }
+    
+    /**
+     * 应用配置变化
+     */
+    private fun applyConfiguration(config: com.ai.assistance.operit.auraflow.config.AuraFlowConfiguration) {
+        // 应用性能配置
+        performanceManager.setOptimizationEnabled(config.performanceConfig.enableMemoryOptimization)
+        
+        // 根据用户偏好调整应用行为
+        if (config.userPreferences.enableHapticFeedback) {
+            // 启用触觉反馈
+        }
+        
+        // 应用浮动窗口配置
+        if (config.floatingWindowConfig.enabled && config.floatingWindowConfig.showOnStartup) {
+            lifecycleScope.launch {
+                openFloatingWindow(this@MainActivity)
             }
         }
     }
@@ -96,6 +156,23 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             permissionManager.checkAllPermissions(this@MainActivity)
         }
+        
+        // 触发性能优化检查
+        if (::performanceManager.isInitialized) {
+            performanceManager.triggerOptimization()
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "MainActivity 销毁")
+        
+        // 清理资源
+        if (::performanceManager.isInitialized) {
+            performanceManager.cleanup()
+        }
+        
+        // 配置管理器不需要手动清理，因为它使用ApplicationContext
     }
 }
 
