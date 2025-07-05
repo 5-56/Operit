@@ -4,9 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -23,8 +26,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.ai.assistance.operit.auraflow.permission.*
+import com.ai.assistance.operit.auraflow.service.FloatingWindowService
 import com.ai.assistance.operit.auraflow.ui.chat.AIChatScreen
 import com.ai.assistance.operit.auraflow.ui.config.AIBrainConfigScreen
+import com.ai.assistance.operit.auraflow.ui.permission.PermissionCheckScreen
 import com.ai.assistance.operit.auraflow.ui.toolbox.ToolboxScreen
 import com.ai.assistance.operit.auraflow.ui.toolbox.UIDebugToolScreen
 import com.ai.assistance.operit.auraflow.ui.toolbox.CommandExecutorScreen
@@ -40,6 +46,10 @@ enum class NavigationDestination(
     val icon: ImageVector,
     val selectedIcon: ImageVector = icon
 ) {
+    // 权限检查页面
+    PERMISSION_CHECK("permission_check", "权限设置", Icons.Default.Security),
+    
+    // 主要页面
     CHAT("chat", "AI对话", Icons.Default.Psychology, Icons.Filled.Psychology),
     CONFIG("config", "配置", Icons.Default.Settings, Icons.Filled.Settings),
     TOOLBOX("toolbox", "工具箱", Icons.Default.Construction, Icons.Filled.Construction),
@@ -56,14 +66,35 @@ enum class NavigationDestination(
  */
 class MainActivity : ComponentActivity() {
     
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        Log.d(TAG, "MainActivity 创建")
+        
+        // 初始化权限管理器
+        val permissionManager = PermissionManager.getInstance()
+        permissionManager.initializeInActivity(this)
         
         setContent {
             AuraFlowTheme {
                 AuraFlowApp()
             }
+        }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "MainActivity 恢复")
+        
+        // 重新检查权限状态
+        val permissionManager = PermissionManager.getInstance()
+        lifecycleScope.launch {
+            permissionManager.checkAllPermissions(this@MainActivity)
         }
     }
 }
@@ -78,6 +109,22 @@ fun AuraFlowApp() {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     
+    // 权限状态检查
+    val permissionManager = remember { PermissionManager.getInstance() }
+    val permissionStates by permissionManager.permissionStates.collectAsStateWithLifecycle()
+    
+    // 检查是否需要显示权限页面
+    val needPermissionSetup = remember(permissionStates) {
+        !permissionManager.areAllRequiredPermissionsGranted()
+    }
+    
+    // 根据权限状态决定起始页面
+    val startDestination = if (needPermissionSetup) {
+        NavigationDestination.PERMISSION_CHECK.route
+    } else {
+        NavigationDestination.CHAT.route
+    }
+    
     // 主界面导航项
     val mainDestinations = listOf(
         NavigationDestination.CHAT,
@@ -85,48 +132,80 @@ fun AuraFlowApp() {
         NavigationDestination.TOOLBOX
     )
     
+    // 当前导航状态
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    
+    // 是否显示底部导航栏
+    val showBottomBar = currentRoute !in listOf(
+        NavigationDestination.PERMISSION_CHECK.route
+    )
+    
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
-                
-                mainDestinations.forEach { destination ->
-                    NavigationBarItem(
-                        icon = {
-                            Icon(
-                                if (currentDestination?.hierarchy?.any { it.route == destination.route } == true) {
-                                    destination.selectedIcon
-                                } else {
-                                    destination.icon
-                                },
-                                contentDescription = destination.title
-                            )
-                        },
-                        label = { Text(destination.title) },
-                        selected = currentDestination?.hierarchy?.any { it.route == destination.route } == true,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                // 避免构建大量回退栈
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (showBottomBar) {
+                NavigationBar {
+                    val currentDestination = navBackStackEntry?.destination
+                    
+                    mainDestinations.forEach { destination ->
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    if (currentDestination?.hierarchy?.any { it.route == destination.route } == true) {
+                                        destination.selectedIcon
+                                    } else {
+                                        destination.icon
+                                    },
+                                    contentDescription = destination.title
+                                )
+                            },
+                            label = { Text(destination.title) },
+                            selected = currentDestination?.hierarchy?.any { it.route == destination.route } == true,
+                            onClick = {
+                                navController.navigate(destination.route) {
+                                    // 避免构建大量回退栈
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    // 避免多个相同目标的副本
+                                    launchSingleTop = true
+                                    // 重新选择之前选择的项目时恢复状态
+                                    restoreState = true
                                 }
-                                // 避免多个相同目标的副本
-                                launchSingleTop = true
-                                // 重新选择之前选择的项目时恢复状态
-                                restoreState = true
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = NavigationDestination.CHAT.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
+            // 权限检查页面
+            composable(NavigationDestination.PERMISSION_CHECK.route) {
+                PermissionCheckScreen(
+                    onPermissionComplete = {
+                        // 权限设置完成，跳转到主页
+                        navController.navigate(NavigationDestination.CHAT.route) {
+                            popUpTo(NavigationDestination.PERMISSION_CHECK.route) {
+                                inclusive = true
+                            }
+                        }
+                    },
+                    onSkip = {
+                        // 跳过权限设置，也跳转到主页（但可能功能受限）
+                        navController.navigate(NavigationDestination.CHAT.route) {
+                            popUpTo(NavigationDestination.PERMISSION_CHECK.route) {
+                                inclusive = true
+                            }
+                        }
+                    }
+                )
+            }
+            
             // AI对话页面
             composable(NavigationDestination.CHAT.route) {
                 AIChatScreen(
@@ -197,8 +276,12 @@ fun AuraFlowApp() {
  */
 private suspend fun openFloatingWindow(context: android.content.Context) {
     try {
+        Log.d("MainActivity", "尝试打开浮动窗口")
+        
         // 检查悬浮窗权限
         if (!Settings.canDrawOverlays(context)) {
+            Log.w("MainActivity", "没有悬浮窗权限，跳转到权限设置")
+            
             // 跳转到权限设置页面
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -209,12 +292,22 @@ private suspend fun openFloatingWindow(context: android.content.Context) {
             return
         }
         
-        // TODO: 启动浮动窗口服务
-        // val floatingWindowIntent = Intent(context, FloatingWindowService::class.java)
-        // context.startForegroundService(floatingWindowIntent)
+        // 启动浮动窗口服务
+        FloatingWindowService.start(context)
+        Log.d("MainActivity", "浮动窗口服务启动请求已发送")
         
     } catch (e: Exception) {
-        android.util.Log.e("MainActivity", "打开浮动窗口失败", e)
+        Log.e("MainActivity", "打开浮动窗口失败", e)
+        // 可以显示Toast提示用户
+        try {
+            val activity = context as? ComponentActivity
+            activity?.runOnUiThread {
+                // 这里可以显示Snackbar或Toast
+                Log.e("MainActivity", "浮动窗口启动失败: ${e.message}")
+            }
+        } catch (toastException: Exception) {
+            Log.e("MainActivity", "显示错误提示失败", toastException)
+        }
     }
 }
 
