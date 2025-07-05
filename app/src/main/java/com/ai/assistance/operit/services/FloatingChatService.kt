@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.agent.OperitAIAgentController
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.SerializableColorScheme
@@ -53,6 +54,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     private var wakeLock: PowerManager.WakeLock? = null
 
     private lateinit var lifecycleOwner: ServiceLifecycleOwner
+    private lateinit var aiAgent: OperitAIAgentController
     private val chatMessages = mutableStateOf<List<ChatMessage>>(emptyList())
     private val attachments = mutableStateOf<List<AttachmentInfo>>(emptyList())
     private lateinit var attachmentManager: AttachmentManager
@@ -143,6 +145,11 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             
             lifecycleOwner = ServiceLifecycleOwner()
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+            
+            // 初始化AI Agent控制器
+            aiAgent = OperitAIAgentController.getInstance(this)
+            LogUtils.i(TAG, "AI Agent 控制器已在浮动服务中初始化")
+            
             attachmentManager = AttachmentManager(this, AIToolHandler.getInstance(this))
             windowState = FloatingWindowState(this)
             windowManager =
@@ -421,5 +428,74 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     fun switchToMode(mode: FloatingMode) {
         windowState.currentMode.value = mode
         LogUtils.d(TAG, "Switching to mode: $mode")
+    }
+
+    /**
+     * 执行AI Agent任务
+     * @param userIntent 用户意图描述
+     */
+    fun executeAgentTask(userIntent: String) {
+        if (!::aiAgent.isInitialized) {
+            LogUtils.e(TAG, "AI Agent未初始化，无法执行任务")
+            return
+        }
+
+        serviceScope.launch {
+            try {
+                LogUtils.i(TAG, "开始执行AI Agent任务: $userIntent")
+                
+                val intent = OperitAIAgentController.UserIntent(
+                    description = userIntent,
+                    priority = OperitAIAgentController.UserIntent.Priority.NORMAL
+                )
+                
+                val result = aiAgent.executeUserIntent(intent)
+                
+                LogUtils.i(TAG, "AI Agent任务执行完成: ${result.success}")
+                
+                // 可以在这里向聊天界面发送结果消息
+                val resultMessage = if (result.success) {
+                    "✅ AI Agent任务执行成功\n执行步骤: ${result.executedSteps.size}\n耗时: ${result.duration/1000.0}秒\n结果: ${result.result}"
+                } else {
+                    "❌ AI Agent任务执行失败\n错误: ${result.error ?: "未知错误"}"
+                }
+                
+                // 这里可以通过现有的消息流发送结果
+                // _messageToSend.tryEmit(Pair(resultMessage, PromptFunctionType.Normal))
+                
+            } catch (e: Exception) {
+                LogUtils.e(TAG, "执行AI Agent任务时出错", e)
+            }
+        }
+    }
+
+    /**
+     * 获取AI Agent状态
+     */
+    fun getAIAgentStatus(): String {
+        return if (::aiAgent.isInitialized) {
+            val state = aiAgent.getCurrentState()
+            when (state) {
+                is OperitAIAgentController.AgentState.Idle -> "待机中"
+                is OperitAIAgentController.AgentState.PerceivingScreen -> "感知屏幕中..."
+                is OperitAIAgentController.AgentState.CommunicatingWithAI -> "与AI大脑通信中..."
+                is OperitAIAgentController.AgentState.ExecutingInstructions -> "执行指令中..."
+                is OperitAIAgentController.AgentState.WaitingForFeedback -> "等待反馈中..."
+                is OperitAIAgentController.AgentState.TaskCompleted -> "任务已完成"
+                is OperitAIAgentController.AgentState.Error -> "错误: ${state.error}"
+            }
+        } else {
+            "AI Agent未初始化"
+        }
+    }
+
+    /**
+     * 停止AI Agent任务
+     */
+    fun stopAIAgent() {
+        if (::aiAgent.isInitialized) {
+            aiAgent.stopAgent()
+            LogUtils.i(TAG, "AI Agent已停止")
+        }
     }
 }

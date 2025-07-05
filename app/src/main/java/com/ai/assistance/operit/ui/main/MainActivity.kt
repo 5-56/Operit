@@ -17,7 +17,12 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.agent.OperitAIAgentController
+import com.ai.assistance.operit.services.UIAccessibilityService
 import com.ai.assistance.operit.data.migration.ChatHistoryMigrationManager
+import android.content.Intent
+import android.provider.Settings
+import android.net.Uri
 import com.ai.assistance.operit.data.preferences.AgreementPreferences
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.androidPermissionPreferences
@@ -40,6 +45,7 @@ class MainActivity : ComponentActivity() {
 
     // ======== 工具和管理器 ========
     private lateinit var toolHandler: AIToolHandler
+    private lateinit var aiAgent: OperitAIAgentController
     private lateinit var preferencesManager: UserPreferencesManager
     private lateinit var agreementPreferences: AgreementPreferences
     private var updateCheckPerformed = false
@@ -268,6 +274,10 @@ class MainActivity : ComponentActivity() {
         toolHandler = AIToolHandler.getInstance(this)
         toolHandler.registerDefaultTools()
 
+        // 初始化AI Agent控制器
+        aiAgent = OperitAIAgentController.getInstance(this)
+        LogUtils.i(TAG, "AI Agent 控制器初始化完成")
+
         // 初始化用户偏好管理器并直接检查初始化状态
         preferencesManager = UserPreferencesManager(this)
         showPreferencesGuide = !preferencesManager.isPreferencesInitialized()
@@ -281,6 +291,76 @@ class MainActivity : ComponentActivity() {
 
         // 初始化数据迁移管理器
         migrationManager = ChatHistoryMigrationManager(this)
+
+        // 检查AI Agent必要权限
+        checkAIAgentPermissions()
+    }
+
+    // ======== 检查AI Agent权限 ========
+    private fun checkAIAgentPermissions() {
+        lifecycleScope.launch {
+            try {
+                // 检查无障碍服务权限
+                val hasAccessibilityService = UIAccessibilityService.isRunning()
+                LogUtils.d(TAG, "无障碍服务状态: $hasAccessibilityService")
+                
+                // 检查悬浮窗权限
+                val hasOverlayPermission = Settings.canDrawOverlays(this@MainActivity)
+                LogUtils.d(TAG, "悬浮窗权限状态: $hasOverlayPermission")
+                
+                if (!hasAccessibilityService) {
+                    LogUtils.w(TAG, "无障碍服务未启用，AI Agent功能将受限")
+                }
+                
+                if (!hasOverlayPermission) {
+                    LogUtils.w(TAG, "悬浮窗权限未授予，操作反馈功能将受限")
+                }
+                
+                // 显示权限状态信息
+                val permissionStatus = buildString {
+                    append("AI Agent 权限状态:\n")
+                    append("📱 无障碍服务: ${if (hasAccessibilityService) "✅ 已启用" else "❌ 未启用"}\n")
+                    append("🎭 悬浮窗权限: ${if (hasOverlayPermission) "✅ 已授予" else "❌ 未授予"}")
+                }
+                LogUtils.i(TAG, permissionStatus)
+                
+            } catch (e: Exception) {
+                LogUtils.e(TAG, "检查AI Agent权限时出错", e)
+            }
+        }
+    }
+
+    // ======== 请求AI Agent权限 ========
+    fun requestAIAgentPermissions() {
+        lifecycleScope.launch {
+            try {
+                // 检查并请求无障碍服务
+                if (!UIAccessibilityService.isRunning()) {
+                    LogUtils.i(TAG, "引导用户开启无障碍服务")
+                    Toast.makeText(this@MainActivity, "为了使AI Agent正常工作，请开启无障碍服务", Toast.LENGTH_LONG).show()
+                    
+                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(intent)
+                }
+                
+                // 检查并请求悬浮窗权限
+                if (!Settings.canDrawOverlays(this@MainActivity)) {
+                    LogUtils.i(TAG, "引导用户授予悬浮窗权限")
+                    Toast.makeText(this@MainActivity, "为了显示操作反馈，请授予悬浮窗权限", Toast.LENGTH_LONG).show()
+                    
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startActivity(intent)
+                }
+            } catch (e: Exception) {
+                LogUtils.e(TAG, "请求AI Agent权限时出错", e)
+                Toast.makeText(this@MainActivity, "权限请求失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // ======== 检查权限级别设置 ========
@@ -406,7 +486,8 @@ class MainActivity : ComponentActivity() {
                                             showPreferencesGuide -> NavItem.UserPreferencesGuide
                                             else -> NavItem.AiChat
                                         },
-                                toolHandler = toolHandler
+                                toolHandler = toolHandler,
+                                aiAgent = aiAgent
                         )
 
                         // 插件加载界面 (带有淡出效果)

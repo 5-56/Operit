@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.agent.OperitAIAgentController
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.common.NavItem
@@ -36,7 +37,11 @@ import kotlinx.coroutines.launch
 data class NavGroup(val title: String, val items: List<NavItem>)
 
 @Composable
-fun OperitApp(initialNavItem: NavItem = NavItem.AiChat, toolHandler: AIToolHandler? = null) {
+fun OperitApp(
+    initialNavItem: NavItem = NavItem.AiChat, 
+    toolHandler: AIToolHandler? = null,
+    aiAgent: OperitAIAgentController? = null
+) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
