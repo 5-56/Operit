@@ -134,17 +134,26 @@ object PerformanceUtils {
             val memoryManager = OperitApplication.memoryManager
             val aiModelManager = OperitApplication.aiModelManager
             val performanceMonitor = OperitApplication.performanceMonitor
+            val networkOptimizer = OperitApplication.networkOptimizer
+            val databaseOptimizer = OperitApplication.databaseOptimizer
             
             when (level) {
                 OptimizationLevel.LIGHT -> {
                     // 轻度优化
                     memoryManager.clearCache()
+                    kotlinx.coroutines.runBlocking {
+                        networkOptimizer.clearCache()
+                    }
                 }
                 
                 OptimizationLevel.MODERATE -> {
                     // 中等优化
                     memoryManager.clearCache()
                     aiModelManager.cleanupExpiredModels()
+                    kotlinx.coroutines.runBlocking {
+                        networkOptimizer.clearCache()
+                        databaseOptimizer.clearCache()
+                    }
                     System.gc()
                 }
                 
@@ -153,6 +162,10 @@ object PerformanceUtils {
                     memoryManager.clearCache()
                     memoryManager.forceGarbageCollection()
                     aiModelManager.cleanup()
+                    kotlinx.coroutines.runBlocking {
+                        networkOptimizer.clearCache()
+                        databaseOptimizer.clearCache()
+                    }
                     System.gc()
                     System.runFinalization()
                 }
@@ -161,10 +174,10 @@ object PerformanceUtils {
             // 记录优化事件
             performanceMonitor.recordEvent("performance_optimization_$level")
             
-            Log.i(TAG, "性能优化完成")
+            Log.i(TAG, "高级性能优化完成")
             
         } catch (e: Exception) {
-            Log.e(TAG, "性能优化失败", e)
+            Log.e(TAG, "高级性能优化失败", e)
         }
     }
     
@@ -370,6 +383,7 @@ fun MemoryOptimizer(
 
 /**
  * 智能缓存工具
+ * 集成内存缓存、网络缓存和数据库缓存的统一接口
  */
 object SmartCache {
     private const val TAG = "SmartCache"
@@ -410,4 +424,77 @@ object SmartCache {
     fun <T : Any> recycle(obj: T) {
         OperitApplication.memoryManager.recycle(obj)
     }
+    
+    /**
+     * 获取网络缓存大小
+     */
+    fun getNetworkCacheSize(): Long {
+        return try {
+            OperitApplication.networkOptimizer.getCacheSize()
+        } catch (e: Exception) {
+            0L
+        }
+    }
+    
+    /**
+     * 获取数据库缓存信息
+     */
+    fun getDatabaseCacheInfo(): String {
+        return try {
+            val metrics = OperitApplication.databaseOptimizer.databaseMetrics.value
+            "数据库缓存: ${metrics.cacheSize} 项，命中率: ${String.format("%.1f", metrics.cacheHitRate)}%"
+        } catch (e: Exception) {
+            "数据库缓存信息不可用"
+        }
+    }
+    
+    /**
+     * 清理所有缓存
+     */
+    suspend fun clearAllCaches() {
+        try {
+            // 清理内存缓存
+            OperitApplication.memoryManager.clearCache()
+            
+            // 清理网络缓存
+            OperitApplication.networkOptimizer.clearCache()
+            
+            // 清理数据库缓存
+            OperitApplication.databaseOptimizer.clearCache()
+            
+            Log.i(TAG, "所有缓存已清理")
+        } catch (e: Exception) {
+            Log.e(TAG, "清理缓存失败", e)
+        }
+    }
+    
+    /**
+     * 获取综合缓存统计信息
+     */
+    fun getCacheStats(): CacheStats {
+        return try {
+            val memoryUsage = getMemoryUsage()
+            val networkCacheSize = getNetworkCacheSize()
+            val databaseMetrics = OperitApplication.databaseOptimizer.databaseMetrics.value
+            val networkMetrics = OperitApplication.networkOptimizer.networkMetrics.value
+            
+            CacheStats(
+                memoryUsagePercentage = memoryUsage.usagePercentage,
+                networkCacheSize = networkCacheSize,
+                networkCacheHitRate = networkMetrics.cacheHitRate,
+                databaseCacheSize = databaseMetrics.cacheSize,
+                databaseCacheHitRate = databaseMetrics.cacheHitRate
+            )
+        } catch (e: Exception) {
+            CacheStats()
+        }
+    }
+    
+    data class CacheStats(
+        val memoryUsagePercentage: Float = 0f,
+        val networkCacheSize: Long = 0L,
+        val networkCacheHitRate: Float = 0f,
+        val databaseCacheSize: Int = 0,
+        val databaseCacheHitRate: Float = 0f
+    )
 }
