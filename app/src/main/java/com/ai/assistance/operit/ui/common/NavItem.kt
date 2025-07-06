@@ -2,6 +2,7 @@ package com.ai.assistance.operit.ui.common
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Assistant
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Description
@@ -28,6 +29,8 @@ sealed class NavItem(val route: String, val titleResId: Int, val icon: ImageVect
                 NavItem("shizuku_commands", R.string.shizuku_commands, Icons.Default.Build)
         object AssistantConfig :
                 NavItem("assistant_config", R.string.nav_assistant_config, Icons.Default.Tune)
+        object IntelligentAssistantSettings :
+                NavItem("intelligent_assistant", R.string.intelligent_assistant, Icons.Default.Assistant)
         object Settings : NavItem("settings", R.string.nav_settings, Icons.Default.Settings)
         object ToolPermissions :
                 NavItem("tool_permissions", R.string.tool_permissions, Icons.Default.Security)

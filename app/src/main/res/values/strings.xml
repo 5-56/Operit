@@ -24,6 +24,7 @@
     <string name="nav_help">帮助中心</string>
     <string name="menu">菜单</string>
     <string name="token_config">获取密钥</string>
+    <string name="intelligent_assistant">智能助手</string>
     
     <!-- 用于NavItem类的标识符 -->
     <string name="shizuku_commands">权限授予</string>

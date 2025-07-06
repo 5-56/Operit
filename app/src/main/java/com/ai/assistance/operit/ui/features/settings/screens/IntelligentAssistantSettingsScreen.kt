@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.core.ai.IntelligentAssistantManager
+import com.ai.assistance.operit.core.assistant.HybridAIEngine
+import com.ai.assistance.operit.core.assistant.SystemResourceManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

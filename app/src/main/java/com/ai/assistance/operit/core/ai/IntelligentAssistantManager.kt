@@ -7,7 +7,7 @@ import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import com.ai.assistance.operit.services.IntelligentAssistantService
+import com.ai.assistance.operit.core.assistant.IntelligentAssistantService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

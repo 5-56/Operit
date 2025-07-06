@@ -140,7 +140,7 @@
         
         <!-- 智能助手常驻服务 -->
         <service
-            android:name=".services.IntelligentAssistantService"
+            android:name=".core.assistant.IntelligentAssistantService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync|microphone" />
