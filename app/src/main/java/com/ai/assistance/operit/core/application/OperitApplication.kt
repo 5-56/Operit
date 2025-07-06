@@ -22,6 +22,14 @@ import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.util.SerializationSetup
 import com.ai.assistance.operit.util.TextSegmenter
+// 新增性能优化组件导入
+import com.ai.assistance.operit.core.MemoryManager
+import com.ai.assistance.operit.core.StartupOptimizer
+import com.ai.assistance.operit.core.AIModelManager
+import com.ai.assistance.operit.core.PerformanceMonitor
+import com.ai.assistance.operit.core.NetworkOptimizer
+import com.ai.assistance.operit.core.DatabaseOptimizer
+import com.ai.assistance.operit.core.AdaptivePerformanceTuner
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +55,28 @@ class OperitApplication : Application() {
         lateinit var globalImageLoader: ImageLoader
             private set
 
+        // 性能优化组件实例
+        lateinit var memoryManager: MemoryManager
+            private set
+            
+        lateinit var startupOptimizer: StartupOptimizer
+            private set
+            
+        lateinit var aiModelManager: AIModelManager
+            private set
+            
+        lateinit var performanceMonitor: PerformanceMonitor
+            private set
+            
+        lateinit var networkOptimizer: NetworkOptimizer
+            private set
+            
+        lateinit var databaseOptimizer: DatabaseOptimizer
+            private set
+            
+        lateinit var adaptivePerformanceTuner: AdaptivePerformanceTuner
+            private set
+
         private const val TAG = "OperitApplication"
     }
 
@@ -59,6 +89,43 @@ class OperitApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        // ==================== 性能优化组件初始化 ====================
+        Log.i(TAG, "开始初始化性能优化组件...")
+        
+        // 1. 启动优化器（最高优先级，尽早初始化）
+        startupOptimizer = StartupOptimizer.getInstance()
+        startupOptimizer.initialize(this)
+        
+        // 2. 内存管理器
+        memoryManager = MemoryManager.getInstance(this)
+        
+        // 3. AI模型管理器
+        aiModelManager = AIModelManager.getInstance(this)
+        
+        // 4. 性能监控器
+        performanceMonitor = PerformanceMonitor.getInstance(this)
+        performanceMonitor.startMonitoring()
+        
+        // 5. 网络优化器
+        networkOptimizer = NetworkOptimizer.getInstance(this)
+        
+        // 6. 数据库优化器
+        databaseOptimizer = DatabaseOptimizer.getInstance(this)
+        
+        // 7. 自适应性能调优器（最后初始化，需要依赖其他组件）
+        adaptivePerformanceTuner = AdaptivePerformanceTuner.getInstance(this)
+        adaptivePerformanceTuner.initialize(
+            memoryManager = memoryManager,
+            performanceMonitor = performanceMonitor,
+            networkOptimizer = networkOptimizer,
+            databaseOptimizer = databaseOptimizer
+        )
+        
+        // 记录应用启动事件
+        performanceMonitor.recordEvent("app_launches")
+        
+        Log.i(TAG, "高级性能优化组件初始化完成 - 包含自适应调优系统")
 
         // Initialize the JSON serializer with our custom module
         json = Json {
@@ -111,6 +178,45 @@ class OperitApplication : Application() {
                             coil.memory.MemoryCache.Builder(this).maxSizePercent(0.15).build()
                         }
                         .build()
+        
+        // ==================== 延迟初始化任务 ====================
+        scheduleDelayedInitialization()
+        
+        Log.i(TAG, "OperitApplication 初始化完成")
+    }
+    
+    /**
+     * 调度延迟初始化任务
+     */
+    private fun scheduleDelayedInitialization() {
+        // 添加启动任务
+        startupOptimizer.addTasks(
+            StartupOptimizer.STAGE_LAZY to StartupOptimizer.SimpleStartupTask(
+                name = "preload_ai_models",
+                dependencies = emptyList()
+            ) { application ->
+                Log.d(TAG, "开始预加载AI模型...")
+                aiModelManager.preloadCoreModels()
+                Log.d(TAG, "AI模型预加载完成")
+            },
+            
+            StartupOptimizer.STAGE_BACKGROUND to StartupOptimizer.SimpleStartupTask(
+                name = "cleanup_expired_cache",
+                dependencies = emptyList()
+            ) { application ->
+                Log.d(TAG, "清理过期缓存...")
+                memoryManager.clearCache()
+                aiModelManager.cleanupExpiredModels()
+                Log.d(TAG, "缓存清理完成")
+            }
+        )
+        
+        // 每30分钟执行一次内存清理
+        startupOptimizer.executeDelayed(30 * 60 * 1000L) {
+            Log.d(TAG, "执行定时内存清理...")
+            memoryManager.clearCache()
+            System.gc()
+        }
     }
 
     /** 初始化应用语言设置 */
@@ -192,6 +298,57 @@ class OperitApplication : Application() {
     
     override fun onTerminate() {
         super.onTerminate()
+        
+        Log.i(TAG, "应用终止，开始清理资源...")
+        
+        // ==================== 性能优化组件清理 ====================
+        try {
+            // 停止性能监控
+            if (::performanceMonitor.isInitialized) {
+                performanceMonitor.stopMonitoring()
+                Log.d(TAG, "性能监控已停止")
+            }
+            
+            // 清理内存管理器
+            if (::memoryManager.isInitialized) {
+                memoryManager.stopMemoryMonitoring()
+                Log.d(TAG, "内存管理器已清理")
+            }
+            
+            // 清理AI模型管理器
+            if (::aiModelManager.isInitialized) {
+                aiModelManager.cleanup()
+                Log.d(TAG, "AI模型管理器已清理")
+            }
+            
+            // 清理启动优化器
+            if (::startupOptimizer.isInitialized) {
+                startupOptimizer.cleanup()
+                Log.d(TAG, "启动优化器已清理")
+            }
+            
+            // 清理网络优化器
+            if (::networkOptimizer.isInitialized) {
+                networkOptimizer.cleanup()
+                Log.d(TAG, "网络优化器已清理")
+            }
+            
+            // 清理数据库优化器
+            if (::databaseOptimizer.isInitialized) {
+                databaseOptimizer.cleanup()
+                Log.d(TAG, "数据库优化器已清理")
+            }
+            
+            // 清理自适应性能调优器
+            if (::adaptivePerformanceTuner.isInitialized) {
+                adaptivePerformanceTuner.cleanup()
+                Log.d(TAG, "自适应性能调优器已清理")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "清理高级性能优化组件失败", e)
+        }
+        
         // 在应用终止时关闭LocalWebServer服务器
         try {
             val webServer = LocalWebServer.getInstance(applicationContext)
@@ -201,6 +358,120 @@ class OperitApplication : Application() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "关闭本地Web服务器失败: ${e.message}", e)
+        }
+        
+        Log.i(TAG, "应用资源清理完成")
+    }
+    
+    /**
+     * 处理内存不足情况
+     */
+    override fun onLowMemory() {
+        super.onLowMemory()
+        
+        Log.w(TAG, "系统内存不足，执行紧急清理...")
+        
+        try {
+            // 触发内存管理器的紧急清理
+            if (::memoryManager.isInitialized) {
+                memoryManager.clearCache()
+                memoryManager.forceGarbageCollection()
+            }
+            
+            // 卸载非关键AI模型
+            if (::aiModelManager.isInitialized) {
+                aiModelManager.cleanupExpiredModels()
+            }
+            
+            // 清理网络缓存
+            if (::networkOptimizer.isInitialized) {
+                kotlinx.coroutines.runBlocking {
+                    networkOptimizer.clearCache()
+                }
+            }
+            
+            // 清理数据库缓存
+            if (::databaseOptimizer.isInitialized) {
+                kotlinx.coroutines.runBlocking {
+                    databaseOptimizer.clearCache()
+                }
+            }
+            
+            // 记录低内存事件
+            if (::performanceMonitor.isInitialized) {
+                performanceMonitor.recordEvent("memory_warnings")
+            }
+            
+            Log.i(TAG, "低内存清理完成")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "低内存清理失败", e)
+        }
+    }
+    
+    /**
+     * 处理系统配置变化时的内存优化
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        
+        Log.d(TAG, "系统要求释放内存，级别: $level")
+        
+        try {
+            when (level) {
+                TRIM_MEMORY_UI_HIDDEN -> {
+                    // UI隐藏时的轻度清理
+                    if (::memoryManager.isInitialized) {
+                        memoryManager.clearCache()
+                    }
+                }
+                
+                TRIM_MEMORY_BACKGROUND,
+                TRIM_MEMORY_MODERATE -> {
+                    // 后台运行时的中等清理
+                    if (::memoryManager.isInitialized) {
+                        memoryManager.clearCache()
+                    }
+                    if (::aiModelManager.isInitialized) {
+                        aiModelManager.cleanupExpiredModels()
+                    }
+                    if (::networkOptimizer.isInitialized) {
+                        kotlinx.coroutines.runBlocking {
+                            networkOptimizer.clearCache()
+                        }
+                    }
+                }
+                
+                TRIM_MEMORY_COMPLETE,
+                TRIM_MEMORY_CRITICAL -> {
+                    // 关键内存不足时的完全清理
+                    if (::memoryManager.isInitialized) {
+                        memoryManager.clearCache()
+                        memoryManager.forceGarbageCollection()
+                    }
+                    if (::aiModelManager.isInitialized) {
+                        aiModelManager.cleanup()
+                    }
+                    if (::networkOptimizer.isInitialized) {
+                        kotlinx.coroutines.runBlocking {
+                            networkOptimizer.clearCache()
+                        }
+                    }
+                    if (::databaseOptimizer.isInitialized) {
+                        kotlinx.coroutines.runBlocking {
+                            databaseOptimizer.clearCache()
+                        }
+                    }
+                }
+            }
+            
+            // 记录内存清理事件
+            if (::performanceMonitor.isInitialized) {
+                performanceMonitor.recordEvent("memory_trim_level_$level")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "内存清理失败", e)
         }
     }
 }

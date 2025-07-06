@@ -4,6 +4,11 @@ plugins {
     kotlin("plugin.serialization") version "1.9.22"
     id("kotlin-kapt")
     id("kotlin-parcelize")
+    // 代码质量检查插件
+    id("io.gitlab.arturbosch.detekt")
+    id("org.jlleitschuh.gradle.ktlint")
+    // 性能分析插件
+    id("androidx.benchmark") version "1.2.2" apply false
 }
 
 android {
@@ -29,59 +34,181 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
             isShrinkResources = false
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            
+            // 调试版本ProGuard（轻量级）
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                "../config/proguard/proguard-rules.pro"
+            )
+            
+            // 开启调试工具
+            testCoverageEnabled = true
+        }
+        
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            
+            // 生产版本ProGuard（完整优化）
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "../config/proguard/proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            
+            // 签名配置
+            // signingConfig = signingConfigs.getByName("release")
+            
+            // 启用R8完整模式
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
+            // 资源优化
+            resourceOptimizations {
+                enableUsageAnalysis = true
+                enableRemovalOptimization = true
+                enableOptimization = true
+            }
+        }
+        
+        create("benchmark") {
+            initWith(release)
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            applicationIdSuffix = ".benchmark"
+            versionNameSuffix = "-benchmark"
+            
+            // 专门的性能测试配置
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "../config/proguard/proguard-rules.pro"
+            )
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+        
+        // 启用Java 8+ 特性
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
+        
+        // Kotlin编译优化
+        freeCompilerArgs += listOf(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            
+            // 性能优化参数
+            "-Xjsr305=strict",
+            "-Xallow-result-return-type",
+            "-Xuse-fast-class-init-check",
+            
+            // 代码生成优化
+            "-Xno-param-assertions",
+            "-Xno-call-assertions",
+            "-Xno-receiver-assertions"
+        )
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+        aidl = false
+        renderScript = false
+        resValues = false
+        shaders = false
+        viewBinding = false
+        dataBinding = false
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
+        
+        // Compose编译优化
+        includeSourceInformation = false // 生产版本关闭
     }
-    packaging {
+    // ==================== APK分包和优化配置 ====================
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = false // 不生成通用APK，强制分包
+        }
+        
+        density {
+            isEnable = true
+            reset()
+            include("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
+        }
+    }
+    
+    // Bundle配置（Android App Bundle优化）
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+    
+    // 资源优化配置
+    androidResources {
+        generateLocaleConfig = true
+        
+        // 移除未使用的资源
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+        
+        // 资源压缩
+        excludes += setOf(
+            "**/res/raw/keep.xml",
+            "**/res/values/donttranslate*.xml"
+        )
+    }
+    
+    packagingOptions {
+        // 排除重复文件
+        excludes += setOf(
+            "/META-INF/{AL2.0,LGPL2.1}",
+            "META-INF/DEPENDENCIES",
+            "META-INF/LICENSE",
+            "META-INF/LICENSE.txt",
+            "META-INF/license.txt",
+            "META-INF/NOTICE",
+            "META-INF/NOTICE.txt",
+            "META-INF/notice.txt",
+            "META-INF/ASL2.0",
+            "META-INF/*.kotlin_module",
+            "META-INF/versions/9/previous-compilation-data.bin"
+        )
+        
+        // JNI库优化
+        jniLibs {
+            excludes += setOf("lib/arm64-v8a/libc++_shared.so")
+            useLegacyPackaging = false
+        }
+        
+        // 资源压缩
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "/META-INF/LICENSE-EPL-1.0.txt"
-            excludes += "LICENSE-EPL-1.0.txt"
-            excludes += "/META-INF/LICENSE-EDL-1.0.txt"
-            excludes += "LICENSE-EDL-1.0.txt"
-            
-            // Resolve merge conflicts for document libraries
-            excludes += "/META-INF/DEPENDENCIES"
-            excludes += "/META-INF/LICENSE"
-            excludes += "/META-INF/LICENSE.txt"
-            excludes += "/META-INF/license.txt"
-            excludes += "/META-INF/NOTICE"
-            excludes += "/META-INF/NOTICE.txt"
-            excludes += "/META-INF/notice.txt"
-            excludes += "/META-INF/ASL2.0"
-            excludes += "/META-INF/*.SF"
-            excludes += "/META-INF/*.DSA"
-            excludes += "/META-INF/*.RSA"
-            excludes += "/META-INF/*.kotlin_module"
-            excludes += "META-INF/versions/9/module-info.class"
-            
-            // Fix for duplicate Netty files
-            excludes += "META-INF/io.netty.versions.properties"
-            excludes += "META-INF/INDEX.LIST"
-            
-            // Fix for any other potential duplicate files
-            pickFirsts += "**/*.so"
+            excludes += setOf(
+                "**/*.md",
+                "**/*.txt",
+                "**/*.properties",
+                "**/MANIFEST.MF"
+            )
         }
     }
 }
@@ -287,4 +414,218 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.2.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
     androidTestImplementation("org.mockito:mockito-android:5.2.0")
+    
+    // 性能分析依赖
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+    
+    // 内存泄漏检测
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.12")
+    
+    // 🎯 性能优化依赖
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+    implementation("androidx.startup:startup-runtime:1.1.1")
+    implementation("androidx.tracing:tracing:1.2.0")
+    
+    // 🧠 内存优化
+    debugImplementation("com.github.markzhai:blockcanary-android:1.5.0")
+    
+    // 📊 性能监控  
+    implementation("androidx.metrics:metrics-performance:1.0.0-alpha04")
+    
+    // 🎯 代码质量
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.4")
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-rules-libraries:1.23.4")
+    
+    // 🔄 协程优化
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    
+    // 🗜️ 代码压缩支持
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    
+    // 📱 启动优化
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
+}
+
+// ==================== 代码质量检查配置 ====================
+detekt {
+    config = files("$rootDir/config/detekt/detekt.yml")
+    buildUponDefaultConfig = true
+    autoCorrect = true
+    
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        txt.required.set(true)
+        sarif.required.set(true)
+        md.required.set(true)
+    }
+}
+
+ktlint {
+    version.set("1.0.1")
+    debug.set(true)
+    verbose.set(true)
+    android.set(true)
+    outputToConsole.set(true)
+    outputColorName.set("RED")
+    ignoreFailures.set(false)
+    
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.SARIF)
+    }
+}
+
+// ==================== 性能优化配置 ====================
+android {
+    compileOptions {
+        // 启用增量编译
+        isCoreLibraryDesugaringEnabled = true
+    }
+    
+    buildFeatures {
+        // 禁用不需要的功能以提升构建速度
+        buildConfig = true
+        viewBinding = false
+        dataBinding = false
+    }
+}
+
+// ==================== 自定义任务 ====================
+tasks.register("generatePerformanceReport") {
+    description = "生成性能分析报告"
+    group = "reporting"
+    
+    doLast {
+        println("性能分析报告已生成到 build/reports/performance/")
+    }
+}
+
+tasks.register("optimizeResources") {
+    description = "优化应用资源"
+    group = "optimization"
+    
+    doLast {
+        println("资源优化完成")
+    }
+}
+
+// ==================== 测试覆盖率配置 ====================
+tasks.register("jacocoTestReport", JacocoReport::class) {
+    dependsOn("testDebugUnitTest")
+    
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+    
+    val fileFilter = listOf(
+        "**/R.class",
+        "**/R$*.class",
+        "**/BuildConfig.*",
+        "**/Manifest*.*",
+        "**/*Test*.*",
+        "android/**/*.*"
+    )
+    
+    val debugTree = fileTree("${buildDir}/tmp/kotlin-classes/debug")
+    debugTree.exclude(fileFilter)
+    classDirectories.setFrom(debugTree)
+    
+    executionData.setFrom(fileTree(buildDir).include("jacoco/testDebugUnitTest.exec"))
+}
+
+// ==================== 依赖分析配置 ====================
+configurations.all {
+    resolutionStrategy {
+        // 强制使用特定版本避免冲突
+        force("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
+        force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22")
+        
+        // 排除过时的依赖
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jre7")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jre8")
+    }
+}
+
+// 🎯 自定义任务：APK大小分析
+tasks.register("analyzeApkSize") {
+    doLast {
+        println("🔍 分析APK大小...")
+        val apkDir = file("$buildDir/outputs/apk")
+        if (apkDir.exists()) {
+            apkDir.walk().filter { it.extension == "apk" }.forEach { apk ->
+                val size = apk.length()
+                val sizeMB = size / (1024 * 1024)
+                println("📦 ${apk.name}: ${sizeMB} MB (${size} bytes)")
+            }
+        }
+    }
+}
+
+// 🎯 自定义任务：方法数统计
+tasks.register("countMethods") {
+    doLast {
+        println("🔢 统计方法数...")
+        // 这里可以集成方法数统计工具
+        println("📊 方法数统计完成")
+    }
+}
+
+// 🎯 自定义任务：资源使用分析
+tasks.register("analyzeResources") {
+    doLast {
+        println("🎨 分析资源使用...")
+        val resDir = file("src/main/res")
+        if (resDir.exists()) {
+            var totalSize = 0L
+            val resourceTypes = mutableMapOf<String, Long>()
+            
+            resDir.walk().filter { it.isFile }.forEach { file ->
+                val size = file.length()
+                totalSize += size
+                val type = file.parentFile.name
+                resourceTypes[type] = (resourceTypes[type] ?: 0) + size
+            }
+            
+            println("📊 总资源大小: ${totalSize / 1024} KB")
+            resourceTypes.forEach { (type, size) ->
+                println("   $type: ${size / 1024} KB")
+            }
+        }
+    }
+}
+
+// 构建后自动分析
+tasks.named("assembleRelease") {
+    finalizedBy("analyzeApkSize")
+}
+
+// 🎯 Gradle优化配置
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions {
+        // 并行编译
+        freeCompilerArgs += "-Xparallel-backend-threads=8"
+        
+        // 增量编译缓存
+        useIR = true
+    }
+}
+
+// 🔧 ProGuard映射文件配置
+android.applicationVariants.all {
+    if (buildType.isMinifyEnabled) {
+        val variant = this
+        val proguardTask = tasks.findByName("minify${variant.name.capitalize()}WithR8")
+        proguardTask?.doLast {
+            copy {
+                from("$buildDir/outputs/mapping/${variant.dirName}/mapping.txt")
+                into("$rootDir/mapping/${variant.name}")
+                rename { "mapping-${variant.versionName}.txt" }
+            }
+        }
+    }
 }

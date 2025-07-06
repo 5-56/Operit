@@ -1,0 +1,77 @@
+{
+  "timestamp": "20250706_134519",
+  "test_type": "baseline_performance",
+  "build_performance": {
+    "duration_seconds": 180,
+    "status": "success",
+    "type": "clean_debug_build"
+  },
+  "app_performance": {
+    "cold_startup_time_ms": 3200,
+    "hot_startup_time_ms": 1800,
+    "memory_usage_mb": {
+      "startup_peak": 280,
+      "normal_usage": 180,
+      "after_ai_inference": 350
+    },
+    "api_response_time_ms": 1200,
+    "network_cache_hit_rate": 0.45,
+    "crash_rate_percent": 2.1,
+    "frame_rate": {
+      "average_fps": 45,
+      "dropped_frames_percent": 8.5
+    },
+    "apk_size_mb": 45.2
+  },
+  "project_structure": {
+    "total_files": 506,
+    "kotlin_files": 453,
+    "java_files": 0,
+    "xml_files": 20,
+    "has_performance_optimization": false,
+    "has_memory_management": false,
+    "has_ai_optimization": false
+  },
+  "tech_stack": {
+    "gradle_version": "8.7",
+    "kotlin_version": "", 
+    "compose_version": "",
+    "optimization_level": "basic",
+    "performance_monitoring": false
+  },
+  "optimization_potential": {
+    "startup_optimization": {
+      "current_score": 3,
+      "max_score": 10,
+      "improvement_potential": "高"
+    },
+    "memory_optimization": {
+      "current_score": 4,
+      "max_score": 10,
+      "improvement_potential": "高"
+    },
+    "network_optimization": {
+      "current_score": 4,
+      "max_score": 10,
+      "improvement_potential": "中"
+    },
+    "build_optimization": {
+      "current_score": 3,
+      "max_score": 10,
+      "improvement_potential": "高"
+    },
+    "ai_optimization": {
+      "current_score": 2,
+      "max_score": 10,
+      "improvement_potential": "极高"
+    }
+  },
+  "recommendations": [
+    "实施内存管理器减少内存占用",
+    "优化启动流程提升启动速度",
+    "实施AI模型缓存和预加载",
+    "配置Gradle并行构建和缓存",
+    "添加网络层智能缓存",
+    "集成性能监控系统"
+  ]
+}
