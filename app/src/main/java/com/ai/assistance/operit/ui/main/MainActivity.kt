@@ -34,6 +34,7 @@ import com.ai.assistance.operit.util.LocaleUtils
 import java.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.ai.assistance.operit.core.ai.IntelligentAssistantManager
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var toolHandler: AIToolHandler
     private lateinit var preferencesManager: UserPreferencesManager
     private lateinit var agreementPreferences: AgreementPreferences
+    private lateinit var intelligentAssistantManager: IntelligentAssistantManager
     private var updateCheckPerformed = false
 
     // ======== 导航状态 ========
@@ -173,6 +175,9 @@ class MainActivity : ComponentActivity() {
 
             // 标记完成初始检查
             initialChecksDone = true
+            
+            // 启动智能助手服务
+            startIntelligentAssistant()
 
             // 设置应用内容
             setAppContent()
@@ -213,6 +218,23 @@ class MainActivity : ComponentActivity() {
         // 初始化MCP服务器并启动插件
         pluginLoadingState.initializeMCPServer(applicationContext, lifecycleScope)
     }
+    
+    // ======== 启动智能助手 ========
+    private fun startIntelligentAssistant() {
+        lifecycleScope.launch {
+            try {
+                val success = intelligentAssistantManager.startIntelligentAssistant()
+                if (success) {
+                    Log.d(TAG, "智能助手服务启动成功")
+                    Toast.makeText(this@MainActivity, "小助手已就绪，说出\"小助手\"来唤醒我", Toast.LENGTH_LONG).show()
+                } else {
+                    Log.e(TAG, "智能助手服务启动失败")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "启动智能助手服务异常", e)
+            }
+        }
+    }
 
     // 配置双击返回退出的处理器
     private fun setupBackPressHandler() {
@@ -252,6 +274,11 @@ class MainActivity : ComponentActivity() {
 
         // 确保隐藏加载界面
         pluginLoadingState.hide()
+        
+        // 释放智能助手管理器资源
+        if (::intelligentAssistantManager.isInitialized) {
+            intelligentAssistantManager.release()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -281,6 +308,9 @@ class MainActivity : ComponentActivity() {
 
         // 初始化数据迁移管理器
         migrationManager = ChatHistoryMigrationManager(this)
+        
+        // 初始化智能助手管理器
+        intelligentAssistantManager = IntelligentAssistantManager.getInstance(this)
     }
 
     // ======== 检查权限级别设置 ========

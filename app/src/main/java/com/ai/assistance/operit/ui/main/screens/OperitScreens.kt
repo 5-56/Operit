@@ -257,6 +257,24 @@ sealed class Screen(
         }
     }
 
+    data object IntelligentAssistantSettings : Screen(navItem = NavItem.IntelligentAssistantSettings) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            com.ai.assistance.operit.ui.features.settings.screens.IntelligentAssistantSettingsScreen(
+                    onBackClick = onGoBack
+            )
+        }
+    }
+
     data object TokenConfig : Screen(parentScreen = AiChat, navItem = NavItem.TokenConfig) {
         @Composable
         override fun Content(
@@ -694,6 +712,7 @@ object OperitRouter {
             NavItem.TokenConfig -> Screen.TokenConfig
             NavItem.UserPreferencesGuide -> Screen.UserPreferencesGuide()
             NavItem.AssistantConfig -> Screen.AssistantConfig
+            NavItem.IntelligentAssistantSettings -> Screen.IntelligentAssistantSettings
             else -> Screen.AiChat
         }
     }
