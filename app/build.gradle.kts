@@ -50,14 +50,26 @@ android {
             
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
+                "../config/proguard/proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
             
-            // 性能优化配置
+            // 高级性能优化配置
             ndk {
                 debugSymbolLevel = "SYMBOL_TABLE"
             }
+            
+            // APK优化配置
+            isZipAlignEnabled = true
+            isJniDebuggable = false
+            renderscriptDebuggable = false
+            
+            // 严格资源收缩模式
+            resourcesShrinkingMode = "strict"
+            
+            // 移除调试信息
+            isProfileable = false
         }
         
         create("benchmark") {
@@ -92,6 +104,45 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
+    // ==================== APK分包和优化配置 ====================
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = true  // 同时生成通用APK
+        }
+        
+        density {
+            isEnable = true
+            reset()
+            include("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
+        }
+    }
+    
+    // Bundle配置（Android App Bundle优化）
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+    
+    // 资源优化配置
+    androidResources {
+        ignoreAssetsPattern = "!.svn:!.git:.*:!CVS:!thumbs.db:!picasa.ini:!*.scc:*~"
+        generateLocaleConfig = true
+        
+        // 额外的资源优化
+        additionalParameters += listOf("--allow-reserved-package-id", "--no-version-vectors")
+    }
+    
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -119,8 +170,36 @@ android {
             excludes += "META-INF/io.netty.versions.properties"
             excludes += "META-INF/INDEX.LIST"
             
+            // 高级APK瘦身：移除不必要的文件
+            excludes += "**/*.md"
+            excludes += "**/*.txt"
+            excludes += "**/*_metadata.bin"
+            excludes += "**/MANIFEST.MF"
+            excludes += "**/*.properties"
+            excludes += "**/*.version"
+            excludes += "**/*.kotlin_metadata"
+            excludes += "**/*.pro"
+            excludes += "**/module-info.class"
+            excludes += "META-INF/com.android.tools/**"
+            excludes += "META-INF/maven/**"
+            excludes += "META-INF/gradle/**"
+            excludes += "META-INF/MANIFEST.MF"
+            excludes += "META-INF/NOTICE*"
+            excludes += "META-INF/LICENSE*"
+            excludes += "META-INF/*.version"
+            
             // Fix for any other potential duplicate files
             pickFirsts += "**/*.so"
+            pickFirsts += "**/libc++_shared.so"
+            pickFirsts += "**/libjsc.so"
+            pickFirsts += "**/libc++.so"
+        }
+        
+        // JNI库优化
+        jniLibs {
+            useLegacyPackaging = false
+            excludes += "**/README.txt"
+            excludes += "**/CHANGELOG.txt"
         }
     }
 }

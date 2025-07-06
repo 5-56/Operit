@@ -27,6 +27,9 @@ import com.ai.assistance.operit.core.MemoryManager
 import com.ai.assistance.operit.core.StartupOptimizer
 import com.ai.assistance.operit.core.AIModelManager
 import com.ai.assistance.operit.core.PerformanceMonitor
+import com.ai.assistance.operit.core.NetworkOptimizer
+import com.ai.assistance.operit.core.DatabaseOptimizer
+import com.ai.assistance.operit.core.AdaptivePerformanceTuner
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +67,15 @@ class OperitApplication : Application() {
             
         lateinit var performanceMonitor: PerformanceMonitor
             private set
+            
+        lateinit var networkOptimizer: NetworkOptimizer
+            private set
+            
+        lateinit var databaseOptimizer: DatabaseOptimizer
+            private set
+            
+        lateinit var adaptivePerformanceTuner: AdaptivePerformanceTuner
+            private set
 
         private const val TAG = "OperitApplication"
     }
@@ -95,10 +107,25 @@ class OperitApplication : Application() {
         performanceMonitor = PerformanceMonitor.getInstance(this)
         performanceMonitor.startMonitoring()
         
+        // 5. 网络优化器
+        networkOptimizer = NetworkOptimizer.getInstance(this)
+        
+        // 6. 数据库优化器
+        databaseOptimizer = DatabaseOptimizer.getInstance(this)
+        
+        // 7. 自适应性能调优器（最后初始化，需要依赖其他组件）
+        adaptivePerformanceTuner = AdaptivePerformanceTuner.getInstance(this)
+        adaptivePerformanceTuner.initialize(
+            memoryManager = memoryManager,
+            performanceMonitor = performanceMonitor,
+            networkOptimizer = networkOptimizer,
+            databaseOptimizer = databaseOptimizer
+        )
+        
         // 记录应用启动事件
         performanceMonitor.recordEvent("app_launches")
         
-        Log.i(TAG, "性能优化组件初始化完成")
+        Log.i(TAG, "高级性能优化组件初始化完成 - 包含自适应调优系统")
 
         // Initialize the JSON serializer with our custom module
         json = Json {
@@ -300,8 +327,26 @@ class OperitApplication : Application() {
                 Log.d(TAG, "启动优化器已清理")
             }
             
+            // 清理网络优化器
+            if (::networkOptimizer.isInitialized) {
+                networkOptimizer.cleanup()
+                Log.d(TAG, "网络优化器已清理")
+            }
+            
+            // 清理数据库优化器
+            if (::databaseOptimizer.isInitialized) {
+                databaseOptimizer.cleanup()
+                Log.d(TAG, "数据库优化器已清理")
+            }
+            
+            // 清理自适应性能调优器
+            if (::adaptivePerformanceTuner.isInitialized) {
+                adaptivePerformanceTuner.cleanup()
+                Log.d(TAG, "自适应性能调优器已清理")
+            }
+            
         } catch (e: Exception) {
-            Log.e(TAG, "清理性能优化组件失败", e)
+            Log.e(TAG, "清理高级性能优化组件失败", e)
         }
         
         // 在应用终止时关闭LocalWebServer服务器
@@ -336,6 +381,20 @@ class OperitApplication : Application() {
             // 卸载非关键AI模型
             if (::aiModelManager.isInitialized) {
                 aiModelManager.cleanupExpiredModels()
+            }
+            
+            // 清理网络缓存
+            if (::networkOptimizer.isInitialized) {
+                kotlinx.coroutines.runBlocking {
+                    networkOptimizer.clearCache()
+                }
+            }
+            
+            // 清理数据库缓存
+            if (::databaseOptimizer.isInitialized) {
+                kotlinx.coroutines.runBlocking {
+                    databaseOptimizer.clearCache()
+                }
             }
             
             // 记录低内存事件
@@ -376,6 +435,11 @@ class OperitApplication : Application() {
                     if (::aiModelManager.isInitialized) {
                         aiModelManager.cleanupExpiredModels()
                     }
+                    if (::networkOptimizer.isInitialized) {
+                        kotlinx.coroutines.runBlocking {
+                            networkOptimizer.clearCache()
+                        }
+                    }
                 }
                 
                 TRIM_MEMORY_COMPLETE,
@@ -387,6 +451,16 @@ class OperitApplication : Application() {
                     }
                     if (::aiModelManager.isInitialized) {
                         aiModelManager.cleanup()
+                    }
+                    if (::networkOptimizer.isInitialized) {
+                        kotlinx.coroutines.runBlocking {
+                            networkOptimizer.clearCache()
+                        }
+                    }
+                    if (::databaseOptimizer.isInitialized) {
+                        kotlinx.coroutines.runBlocking {
+                            databaseOptimizer.clearCache()
+                        }
                     }
                 }
             }
