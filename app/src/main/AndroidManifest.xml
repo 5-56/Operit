@@ -138,6 +138,13 @@
             android:name=".services.TermuxCommandResultService"
             android:exported="false" />
         
+        <!-- 智能助手常驻服务 -->
+        <service
+            android:name=".services.IntelligentAssistantService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|microphone" />
+        
     </application>
 
 </manifest>

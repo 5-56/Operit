@@ -183,6 +183,8 @@ dependencies {
     
     // 用于向量嵌入的TF Lite (如果需要自定义嵌入)
     implementation("org.tensorflow:tensorflow-lite:2.8.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.8.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.2")
 
     // BouncyCastle加密库 - 用于PKCS12密钥处理
     implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
