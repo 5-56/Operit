@@ -15,7 +15,7 @@ import androidx.core.app.NotificationCompat
 import com.ai.assistance.operit.MainActivity
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.ai.hybrid.HybridAIEngine
-import com.ai.assistance.operit.core.ai.local.LocalSTTEngine
+import com.ai.assistance.operit.core.ai.speech.MultiSTTEngineManager
 import com.ai.assistance.operit.core.ai.local.LocalTTSEngine
 import com.ai.assistance.operit.core.ai.local.VoiceWakeUpDetector
 import com.ai.assistance.operit.core.system.SystemResourceManager
@@ -52,7 +52,7 @@ class IntelligentAssistantService : Service() {
     private lateinit var hybridAIEngine: HybridAIEngine
     private lateinit var systemResourceManager: SystemResourceManager
     private lateinit var voiceWakeUpDetector: VoiceWakeUpDetector
-    private lateinit var sttEngine: LocalSTTEngine
+    private lateinit var multiSTTManager: MultiSTTEngineManager
     private lateinit var ttsEngine: LocalTTSEngine
     private lateinit var aiToolHandler: AIToolHandler
     private lateinit var preferencesManager: UserPreferencesManager
@@ -154,7 +154,7 @@ class IntelligentAssistantService : Service() {
             
             // 初始化语音组件
             voiceWakeUpDetector = VoiceWakeUpDetector(this)
-            sttEngine = LocalSTTEngine(this)
+            multiSTTManager = MultiSTTEngineManager(this)
             ttsEngine = LocalTTSEngine(this)
             
             // 初始化工具处理器
@@ -231,8 +231,8 @@ class IntelligentAssistantService : Service() {
         // 启动语音合成引擎
         ttsEngine.initialize()
         
-        // 启动语音识别引擎
-        sttEngine.initialize()
+        // 启动多引擎语音识别管理器
+        multiSTTManager.initialize()
         
         Log.d(TAG, "核心服务启动完成")
     }
@@ -333,10 +333,10 @@ class IntelligentAssistantService : Service() {
         }
         
         // 开始语音识别
-        sttEngine.startListening { spokenText ->
-            if (spokenText.isNotBlank()) {
+        multiSTTManager.startStreamingRecognition { result ->
+            if (result.text.isNotBlank() && result.isFinal) {
                 conversationTimeout?.cancel()
-                processUserCommand(spokenText)
+                processUserCommand(result.text)
             }
         }
     }
@@ -721,8 +721,8 @@ class IntelligentAssistantService : Service() {
                 voiceWakeUpDetector.release()
             }
             
-            if (::sttEngine.isInitialized) {
-                sttEngine.release()
+            if (::multiSTTManager.isInitialized) {
+                multiSTTManager.release()
             }
             
             if (::ttsEngine.isInitialized) {

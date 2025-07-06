@@ -185,6 +185,22 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite:2.8.0")
     implementation("org.tensorflow:tensorflow-lite-gpu:2.8.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.2")
+    
+    // 语音识别引擎依赖
+    // Sherpa-NCNN - 轻量级离线语音识别
+    implementation("com.k2fsa.sherpa:sherpa-ncnn:1.10.25")
+    implementation("com.k2fsa.sherpa:sherpa-ncnn-streaming:1.10.25")
+    
+    // ONNX Runtime - 用于运行Whisper模型
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
+    
+    // 音频处理库
+    implementation("com.github.wendykierp:JTransforms:3.1")
+    implementation("org.apache.commons:commons-math3:3.6.1")
+    
+    // 网络模型下载
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // BouncyCastle加密库 - 用于PKCS12密钥处理
     implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
