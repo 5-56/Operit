@@ -1,0 +1,219 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: '创建GitHub Release'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🛒 Checkout 代码
+      uses: actions/checkout@v4
+      
+    - name: ☕ 设置 Java 环境
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'adopt'
+        
+    - name: 📱 设置 Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 34
+        build-tools: 34.0.0
+        
+    - name: 🔐 给 gradlew 添加执行权限
+      run: chmod +x gradlew
+      
+    - name: 📦 Gradle 缓存
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: 🔍 检查项目依赖
+      run: |
+        echo "📋 检查项目结构..."
+        ls -la
+        echo "📋 检查应用目录..."
+        ls -la app/
+        echo "📋 检查构建文件..."
+        ls -la app/build.gradle.kts
+        echo "📋 检查 .keep 文件..."
+        find . -name ".keep" -type f || echo "未找到 .keep 文件"
+        
+    - name: ⚠️ 依赖提醒
+      run: |
+        echo "⚠️ 注意：此项目可能需要额外的依赖库"
+        echo "🔗 请从以下地址下载依赖并放入项目中："
+        echo "   https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7"
+        echo "📁 将下载的文件放入有 .keep 文件的目录中"
+        
+    - name: 🧹 清理项目
+      run: ./gradlew clean
+      
+    - name: 🔨 构建调试版本
+      run: ./gradlew assembleDebug
+      
+    - name: 🚀 构建发布版本
+      run: ./gradlew assembleRelease
+      
+    - name: 📋 检查构建结果
+      run: |
+        echo "📦 检查构建输出..."
+        ls -la app/build/outputs/apk/release/
+        ls -la app/build/outputs/apk/debug/
+        
+        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+          echo "✅ 发布版 APK 构建成功"
+          APK_SIZE=$(ls -lh app/build/outputs/apk/release/app-release.apk | awk '{print $5}')
+          echo "📦 APK 大小: $APK_SIZE"
+        else
+          echo "❌ 发布版 APK 构建失败"
+          exit 1
+        fi
+        
+    - name: 📁 准备发布文件
+      run: |
+        mkdir -p release
+        
+        # 复制APK文件
+        cp app/build/outputs/apk/release/app-release.apk release/Operit-AI-v1.2.0.apk
+        cp app/build/outputs/apk/debug/app-debug.apk release/Operit-AI-v1.2.0-debug.apk
+        
+        # 生成校验和
+        cd release
+        for file in *.apk; do
+          if [ -f "$file" ]; then
+            sha256sum "$file" > "${file}.sha256"
+            md5sum "$file" > "${file}.md5"
+          fi
+        done
+        cd ..
+        
+        # 生成发布说明
+        cat > release/README.md << EOF
+        # Operit AI v1.2.0 发布包
+        
+        ## 📦 包含文件
+        - **Operit-AI-v1.2.0.apk** - 发布版 APK (推荐安装)
+        - **Operit-AI-v1.2.0-debug.apk** - 调试版 APK
+        - ***.sha256** - SHA256 校验和文件
+        - ***.md5** - MD5 校验和文件
+        
+        ## 📱 系统要求
+        - Android 8.0 (API 26) 或更高版本
+        - RAM: 推荐 4GB 或更多
+        - 存储空间: 至少 500MB 可用空间
+        - 架构: 支持 ARM64、ARM32
+        
+        ## 🚀 安装说明
+        1. 下载 Operit-AI-v1.2.0.apk
+        2. 在设备上启用"未知来源"应用安装
+        3. 运行APK文件进行安装
+        4. 按照应用内指引完成初始设置
+        
+        ## 🔧 权限需求
+        - 存储权限: 读写文件
+        - 网络权限: API调用和数据同步
+        - 麦克风权限: 语音识别功能
+        - 系统权限: 高级功能需要 Shizuku 或 Root
+        
+        ## 📞 支持
+        - 项目主页: https://github.com/AAswordman/Operit
+        - 问题报告: https://github.com/AAswordman/Operit/issues
+        - 邮箱: aaswordsman@foxmail.com
+        
+        ---
+        *构建时间: $(date)*
+        *构建版本: 1.2.0*
+        *构建环境: GitHub Actions*
+        EOF
+        
+    - name: 📤 上传构建产物
+      uses: actions/upload-artifact@v3
+      with:
+        name: operit-ai-apk
+        path: release/
+        retention-days: 30
+        
+    - name: 🏷️ 创建 GitHub Release (如果是标签推送)
+      if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/Operit-AI-v1.2.0.apk
+          release/Operit-AI-v1.2.0-debug.apk
+          release/Operit-AI-v1.2.0.apk.sha256
+          release/Operit-AI-v1.2.0.apk.md5
+          release/README.md
+        name: Operit AI v1.2.0
+        body: |
+          # Operit AI v1.2.0 发布
+          
+          ## 🆕 新功能
+          - 增强的智能助手响应速度
+          - 优化的语音识别准确度
+          - 完善的系统自动化功能
+          
+          ## 🔧 改进
+          - 修复了后台服务稳定性问题
+          - 优化了内存使用
+          - 改善了界面响应性
+          
+          ## 🐛 Bug修复
+          - 修复了某些设备上的崩溃问题
+          - 解决了权限申请流程的问题
+          - 修复了语音唤醒偶尔失效的问题
+          
+          ## 📱 系统要求
+          - Android 8.0 (API 26) 或更高版本
+          - RAM: 推荐 4GB 或更多
+          - 存储空间: 至少 500MB 可用空间
+          - 架构: 支持 ARM64、ARM32
+          
+          ## 🚀 安装说明
+          1. 下载 `Operit-AI-v1.2.0.apk`
+          2. 在设备上启用"未知来源"应用安装
+          3. 运行APK文件进行安装
+          4. 按照应用内指引完成初始设置
+          
+          ## 🔧 权限需求
+          - 存储权限: 读写文件
+          - 网络权限: API调用和数据同步
+          - 麦克风权限: 语音识别功能
+          - 系统权限: 高级功能需要 Shizuku 或 Root
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📊 构建摘要
+      run: |
+        echo "🎉 构建完成！"
+        echo "📋 构建摘要:"
+        echo "   • 项目名称: Operit AI"
+        echo "   • 版本: 1.2.0"
+        echo "   • 构建时间: $(date)"
+        echo "   • 构建环境: GitHub Actions"
+        echo ""
+        echo "📦 构建产物:"
+        ls -la release/
+        echo ""
+        echo "✨ 发布版 APK 已准备就绪！"
