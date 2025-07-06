@@ -1,22 +1,36 @@
 package com.ai.assistance.operit.core
 
 import android.content.Context
+import android.util.Log
 import android.util.LruCache
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * AI模型管理器
- * 负责AI模型的加载、缓存、预热和生命周期管理
+ * 🤖 AI模型管理器
+ * 
+ * 功能特性：
+ * - 多级模型缓存系统
+ * - 智能模型预热机制
+ * - 模型生命周期管理
+ * - 异步模型加载
+ * - 模型性能监控
+ * - 自适应资源管理
  */
 class AIModelManager private constructor(private val context: Context) {
     
     companion object {
+        private const val TAG = "AIModelManager"
+        private const val MAX_CACHE_SIZE_MB = 500 // 最大缓存大小
+        private const val PRELOAD_THRESHOLD_MS = 2000 // 预加载阈值
+        
         @Volatile
         private var INSTANCE: AIModelManager? = null
         
@@ -25,547 +39,624 @@ class AIModelManager private constructor(private val context: Context) {
                 INSTANCE ?: AIModelManager(context.applicationContext).also { INSTANCE = it }
             }
         }
-        
-        // 模型缓存大小限制
-        private const val MODEL_CACHE_SIZE = 3
-        private const val PRELOAD_TIMEOUT_MS = 30000L
-        
-        // 模型类型定义
-        const val MODEL_TYPE_CHAT = "chat"
-        const val MODEL_TYPE_VOICE = "voice"
-        const val MODEL_TYPE_VISION = "vision"
-        const val MODEL_TYPE_LOCAL = "local"
     }
     
-    // 模型缓存
-    private val modelCache = LruCache<String, AIModel>(MODEL_CACHE_SIZE)
+    // 核心组件
+    private val modelCache = ModelCacheManager()
+    private val loadingManager = ModelLoadingManager()
+    private val lifecycleManager = ModelLifecycleManager()
+    private val performanceTracker = ModelPerformanceTracker()
     
-    // 模型状态管理
-    private val modelStates = ConcurrentHashMap<String, ModelState>()
-    private val _modelLoadingProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
-    val modelLoadingProgress: StateFlow<Map<String, Float>> = _modelLoadingProgress.asStateFlow()
-    
-    // 协程管理
-    private val modelScope = CoroutineScope(
+    // 协程作用域
+    private val managerScope = CoroutineScope(
         Dispatchers.Default + SupervisorJob() + CoroutineName("AIModelManager")
     )
     
-    // 预加载管理
-    private val preloadJobs = ConcurrentHashMap<String, Job>()
-    private val isPreloading = AtomicBoolean(false)
-    
-    // 模型配置
-    private val modelConfigs = mutableMapOf<String, ModelConfig>()
+    // 状态管理
+    private val _loadingStates = MutableStateFlow<Map<String, ModelLoadingState>>(emptyMap())
+    val loadingStates: StateFlow<Map<String, ModelLoadingState>> = _loadingStates.asStateFlow()
     
     init {
-        initializeDefaultModels()
+        initializeManager()
+        Log.d(TAG, "AIModelManager initialized")
     }
     
     /**
-     * 初始化默认模型配置
+     * 💾 多级模型缓存管理器
      */
-    private fun initializeDefaultModels() {
-        // DeepSeek模型配置
-        registerModel(ModelConfig(
-            id = "deepseek",
-            name = "DeepSeek",
-            type = MODEL_TYPE_CHAT,
-            isLocal = false,
-            priority = ModelPriority.HIGH,
-            preloadOnStartup = true,
-            maxCacheTime = 30 * 60 * 1000L // 30分钟
-        ))
+    private inner class ModelCacheManager {
+        // L1: GPU内存缓存 (1-2个活跃模型)
+        private val gpuCache = LruCache<String, AIModel>(2)
         
-        // Gemini模型配置
-        registerModel(ModelConfig(
-            id = "gemini",
-            name = "Gemini Pro",
-            type = MODEL_TYPE_CHAT,
-            isLocal = false,
-            priority = ModelPriority.MEDIUM,
-            preloadOnStartup = true,
-            maxCacheTime = 20 * 60 * 1000L // 20分钟
-        ))
+        // L2: RAM内存缓存 (3-5个热点模型) 
+        private val ramCache = LruCache<String, WeakReference<AIModel>>(5)
         
-        // 本地语音模型配置
-        registerModel(ModelConfig(
-            id = "sherpa-ncnn",
-            name = "Sherpa NCNN",
-            type = MODEL_TYPE_VOICE,
-            isLocal = true,
-            priority = ModelPriority.HIGH,
-            preloadOnStartup = true,
-            maxCacheTime = 60 * 60 * 1000L // 1小时
-        ))
+        // L3: 磁盘缓存 (10-20个预处理模型)
+        private val diskCache = ConcurrentHashMap<String, ModelCacheEntry>()
         
-        // 本地推理模型配置
-        registerModel(ModelConfig(
-            id = "local-llm",
-            name = "Local LLM",
-            type = MODEL_TYPE_LOCAL,
-            isLocal = true,
-            priority = ModelPriority.LOW,
-            preloadOnStartup = false,
-            maxCacheTime = 45 * 60 * 1000L // 45分钟
-        ))
-    }
-    
-    /**
-     * 注册模型配置
-     */
-    fun registerModel(config: ModelConfig) {
-        modelConfigs[config.id] = config
-        modelStates[config.id] = ModelState.NOT_LOADED
-    }
-    
-    /**
-     * 预加载核心模型
-     */
-    suspend fun preloadCoreModels() {
-        if (!isPreloading.compareAndSet(false, true)) {
-            return
+        // L4: 云端缓存管理
+        private val cloudCache = CloudCacheManager()
+        
+        fun putInGpuCache(modelId: String, model: AIModel) {
+            gpuCache.put(modelId, model)
+            model.loadToGpu()
+            Log.d(TAG, "Model $modelId loaded to GPU cache")
         }
         
-        try {
-            val coreModels = modelConfigs.values
-                .filter { it.preloadOnStartup }
-                .sortedByDescending { it.priority.ordinal }
+        fun getFromGpuCache(modelId: String): AIModel? {
+            return gpuCache.get(modelId)
+        }
+        
+        fun putInRamCache(modelId: String, model: AIModel) {
+            ramCache.put(modelId, WeakReference(model))
+            Log.d(TAG, "Model $modelId cached in RAM")
+        }
+        
+        fun getFromRamCache(modelId: String): AIModel? {
+            val ref = ramCache.get(modelId)
+            val model = ref?.get()
+            if (model == null && ref != null) {
+                ramCache.remove(modelId) // 清理已回收的引用
+            }
+            return model
+        }
+        
+        fun putInDiskCache(modelId: String, model: AIModel) {
+            val cacheDir = File(context.cacheDir, "ai_models")
+            if (!cacheDir.exists()) cacheDir.mkdirs()
             
-            coreModels.map { config ->
-                modelScope.async {
-                    preloadModel(config.id)
+            val cacheEntry = ModelCacheEntry(
+                modelId = modelId,
+                filePath = File(cacheDir, "$modelId.cache").absolutePath,
+                timestamp = System.currentTimeMillis(),
+                size = model.getModelSize(),
+                accessCount = 1
+            )
+            
+            managerScope.launch(Dispatchers.IO) {
+                try {
+                    model.saveToDisk(cacheEntry.filePath)
+                    diskCache[modelId] = cacheEntry
+                    Log.d(TAG, "Model $modelId cached to disk")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to cache model $modelId to disk", e)
                 }
-            }.awaitAll()
+            }
+        }
+        
+        suspend fun getFromDiskCache(modelId: String): AIModel? {
+            val cacheEntry = diskCache[modelId] ?: return null
             
-        } finally {
-            isPreloading.set(false)
+            return withContext(Dispatchers.IO) {
+                try {
+                    val model = loadModelFromDisk(cacheEntry.filePath, modelId)
+                    cacheEntry.accessCount++
+                    cacheEntry.lastAccess = System.currentTimeMillis()
+                    Log.d(TAG, "Model $modelId loaded from disk cache")
+                    model
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to load model $modelId from disk cache", e)
+                    diskCache.remove(modelId) // 清理损坏的缓存
+                    null
+                }
+            }
+        }
+        
+        suspend fun getFromCloudCache(modelId: String): AIModel? {
+            return cloudCache.downloadModel(modelId)
+        }
+        
+        fun evictOldestFromDiskCache() {
+            val oldestEntry = diskCache.values.minByOrNull { it.lastAccess }
+            oldestEntry?.let {
+                diskCache.remove(it.modelId)
+                File(it.filePath).delete()
+                Log.d(TAG, "Evicted model ${it.modelId} from disk cache")
+            }
+        }
+        
+        fun clearCache() {
+            gpuCache.evictAll()
+            ramCache.evictAll()
+            diskCache.clear()
+            Log.d(TAG, "All caches cleared")
+        }
+        
+        fun getCacheStats(): CacheStats {
+            return CacheStats(
+                gpuCacheSize = gpuCache.size(),
+                ramCacheSize = ramCache.size(),
+                diskCacheSize = diskCache.size,
+                totalCacheSize = calculateTotalCacheSize()
+            )
+        }
+        
+        private fun calculateTotalCacheSize(): Long {
+            return diskCache.values.sumOf { it.size }
         }
     }
     
     /**
-     * 预加载特定模型
+     * 📡 云端缓存管理器
      */
-    suspend fun preloadModel(modelId: String): Result<AIModel> {
-        return withContext(modelScope.coroutineContext) {
-            try {
-                val config = modelConfigs[modelId] 
-                    ?: return@withContext Result.failure(IllegalArgumentException("Model $modelId not found"))
-                
-                // 检查是否已加载
-                modelCache.get(modelId)?.let { 
-                    return@withContext Result.success(it) 
+    private inner class CloudCacheManager {
+        suspend fun downloadModel(modelId: String): AIModel? {
+            return withContext(Dispatchers.IO) {
+                try {
+                    Log.d(TAG, "Downloading model $modelId from cloud")
+                    // 这里实现实际的云端下载逻辑
+                    // 模拟下载过程
+                    delay(2000)
+                    
+                    // 创建模拟模型
+                    SimulatedAIModel(modelId, ModelType.CHAT)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to download model $modelId", e)
+                    null
                 }
-                
-                // 更新状态
-                modelStates[modelId] = ModelState.LOADING
-                updateLoadingProgress(modelId, 0f)
-                
-                // 创建预加载任务
-                val preloadJob = async {
-                    withTimeout(PRELOAD_TIMEOUT_MS) {
-                        loadModelInternal(config)
+            }
+        }
+        
+        suspend fun uploadModel(modelId: String, model: AIModel) {
+            withContext(Dispatchers.IO) {
+                try {
+                    Log.d(TAG, "Uploading model $modelId to cloud")
+                    // 实现云端上传逻辑
+                    delay(1000)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to upload model $modelId", e)
+                }
+            }
+        }
+    }
+    
+    /**
+     * 🔄 模型加载管理器
+     */
+    private inner class ModelLoadingManager {
+        private val loadingJobs = ConcurrentHashMap<String, Job>()
+        private val loadingQueue = ArrayDeque<LoadingRequest>()
+        private val maxConcurrentLoads = 2
+        private val activeLoads = AtomicInteger(0)
+        
+        suspend fun loadModel(
+            modelId: String,
+            modelType: ModelType,
+            priority: LoadPriority = LoadPriority.NORMAL
+        ): AIModel? {
+            // 检查是否已在加载
+            if (loadingJobs.containsKey(modelId)) {
+                return loadingJobs[modelId]?.let { 
+                    try {
+                        (it as Deferred<AIModel?>).await()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to await model loading", e)
+                        null
                     }
                 }
-                
-                preloadJobs[modelId] = preloadJob
-                val model = preloadJob.await()
-                
-                // 缓存模型
-                modelCache.put(modelId, model)
-                modelStates[modelId] = ModelState.LOADED
-                updateLoadingProgress(modelId, 1f)
-                
-                Result.success(model)
-                
-            } catch (e: Exception) {
-                modelStates[modelId] = ModelState.ERROR
-                updateLoadingProgress(modelId, 0f)
-                Result.failure(e)
-            } finally {
-                preloadJobs.remove(modelId)
             }
-        }
-    }
-    
-    /**
-     * 获取模型（如果未加载则同步加载）
-     */
-    suspend fun getModel(modelId: String): Result<AIModel> {
-        // 先尝试从缓存获取
-        modelCache.get(modelId)?.let { 
-            return Result.success(it) 
-        }
-        
-        // 如果正在预加载，等待完成
-        preloadJobs[modelId]?.let { job ->
-            return try {
-                val model = job.await()
-                Result.success(model)
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-        }
-        
-        // 同步加载
-        return preloadModel(modelId)
-    }
-    
-    /**
-     * 内部模型加载逻辑
-     */
-    private suspend fun loadModelInternal(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.1f)
-        
-        return when (config.type) {
-            MODEL_TYPE_CHAT -> loadChatModel(config)
-            MODEL_TYPE_VOICE -> loadVoiceModel(config)
-            MODEL_TYPE_VISION -> loadVisionModel(config)
-            MODEL_TYPE_LOCAL -> loadLocalModel(config)
-            else -> throw IllegalArgumentException("Unknown model type: ${config.type}")
-        }
-    }
-    
-    /**
-     * 加载聊天模型
-     */
-    private suspend fun loadChatModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.3f)
-        
-        if (config.isLocal) {
-            // 加载本地聊天模型
-            return loadLocalChatModel(config)
-        } else {
-            // 初始化在线聊天模型
-            return initializeOnlineChatModel(config)
-        }
-    }
-    
-    /**
-     * 加载语音模型
-     */
-    private suspend fun loadVoiceModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.3f)
-        
-        // 检查模型文件是否存在
-        val modelFile = getModelFile(config.id)
-        if (!modelFile.exists()) {
-            updateLoadingProgress(config.id, 0.5f)
-            // 下载模型文件
-            downloadModelFile(config)
-        }
-        
-        updateLoadingProgress(config.id, 0.8f)
-        
-        // 加载语音模型
-        return loadVoiceModelFromFile(config, modelFile)
-    }
-    
-    /**
-     * 加载视觉模型
-     */
-    private suspend fun loadVisionModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.3f)
-        
-        // 视觉模型加载逻辑
-        return loadTensorFlowLiteModel(config)
-    }
-    
-    /**
-     * 加载本地模型
-     */
-    private suspend fun loadLocalModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.3f)
-        
-        val modelFile = getModelFile(config.id)
-        if (!modelFile.exists()) {
-            throw IllegalStateException("Local model file not found: ${modelFile.path}")
-        }
-        
-        updateLoadingProgress(config.id, 0.6f)
-        
-        // 根据文件类型选择加载方式
-        return when {
-            modelFile.name.endsWith(".tflite") -> loadTensorFlowLiteModel(config)
-            modelFile.name.endsWith(".onnx") -> loadOnnxModel(config)
-            else -> throw IllegalArgumentException("Unsupported model format")
-        }
-    }
-    
-    /**
-     * 加载本地聊天模型
-     */
-    private suspend fun loadLocalChatModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.5f)
-        delay(100) // 模拟加载时间
-        updateLoadingProgress(config.id, 1.0f)
-        
-        return LocalChatModel(config.id, config.name)
-    }
-    
-    /**
-     * 初始化在线聊天模型
-     */
-    private suspend fun initializeOnlineChatModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.5f)
-        
-        // 测试网络连接
-        if (!isNetworkAvailable()) {
-            throw IllegalStateException("Network not available for online model")
-        }
-        
-        updateLoadingProgress(config.id, 0.8f)
-        delay(100) // 模拟初始化时间
-        updateLoadingProgress(config.id, 1.0f)
-        
-        return OnlineChatModel(config.id, config.name)
-    }
-    
-    /**
-     * 加载TensorFlow Lite模型
-     */
-    private suspend fun loadTensorFlowLiteModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.6f)
-        delay(200) // 模拟加载时间
-        updateLoadingProgress(config.id, 1.0f)
-        
-        return TensorFlowLiteModel(config.id, config.name)
-    }
-    
-    /**
-     * 加载ONNX模型
-     */
-    private suspend fun loadOnnxModel(config: ModelConfig): AIModel {
-        updateLoadingProgress(config.id, 0.6f)
-        delay(200) // 模拟加载时间
-        updateLoadingProgress(config.id, 1.0f)
-        
-        return OnnxModel(config.id, config.name)
-    }
-    
-    /**
-     * 从文件加载语音模型
-     */
-    private suspend fun loadVoiceModelFromFile(config: ModelConfig, modelFile: File): AIModel {
-        updateLoadingProgress(config.id, 0.9f)
-        delay(150) // 模拟加载时间
-        updateLoadingProgress(config.id, 1.0f)
-        
-        return VoiceModel(config.id, config.name, modelFile.path)
-    }
-    
-    /**
-     * 下载模型文件
-     */
-    private suspend fun downloadModelFile(config: ModelConfig) {
-        // 模拟下载过程
-        for (i in 1..5) {
-            delay(100)
-            updateLoadingProgress(config.id, 0.5f + i * 0.06f)
-        }
-    }
-    
-    /**
-     * 获取模型文件路径
-     */
-    private fun getModelFile(modelId: String): File {
-        val modelsDir = File(context.filesDir, "models")
-        modelsDir.mkdirs()
-        return File(modelsDir, "$modelId.model")
-    }
-    
-    /**
-     * 检查网络可用性
-     */
-    private fun isNetworkAvailable(): Boolean {
-        // 简化的网络检查
-        return true
-    }
-    
-    /**
-     * 更新加载进度
-     */
-    private fun updateLoadingProgress(modelId: String, progress: Float) {
-        val currentProgress = _modelLoadingProgress.value.toMutableMap()
-        currentProgress[modelId] = progress
-        _modelLoadingProgress.value = currentProgress
-    }
-    
-    /**
-     * 卸载模型
-     */
-    fun unloadModel(modelId: String) {
-        modelCache.remove(modelId)
-        modelStates[modelId] = ModelState.NOT_LOADED
-        
-        // 取消预加载任务
-        preloadJobs[modelId]?.cancel()
-        preloadJobs.remove(modelId)
-        
-        // 清理进度状态
-        val currentProgress = _modelLoadingProgress.value.toMutableMap()
-        currentProgress.remove(modelId)
-        _modelLoadingProgress.value = currentProgress
-    }
-    
-    /**
-     * 获取模型状态
-     */
-    fun getModelState(modelId: String): ModelState {
-        return modelStates[modelId] ?: ModelState.NOT_LOADED
-    }
-    
-    /**
-     * 获取所有模型状态
-     */
-    fun getAllModelStates(): Map<String, ModelState> {
-        return modelStates.toMap()
-    }
-    
-    /**
-     * 清理过期模型
-     */
-    fun cleanupExpiredModels() {
-        modelScope.launch {
-            val currentTime = System.currentTimeMillis()
-            val expiredModels = mutableListOf<String>()
             
-            modelConfigs.forEach { (modelId, config) ->
-                val model = modelCache.get(modelId)
-                if (model != null && (currentTime - model.loadTime) > config.maxCacheTime) {
-                    expiredModels.add(modelId)
+            val request = LoadingRequest(modelId, modelType, priority)
+            return loadModelInternal(request)
+        }
+        
+        private suspend fun loadModelInternal(request: LoadingRequest): AIModel? {
+            val deferred = managerScope.async {
+                updateLoadingState(request.modelId, ModelLoadingState.LOADING)
+                
+                try {
+                    // 1. 尝试从GPU缓存获取
+                    modelCache.getFromGpuCache(request.modelId)?.let { 
+                        updateLoadingState(request.modelId, ModelLoadingState.COMPLETED)
+                        return@async it 
+                    }
+                    
+                    // 2. 尝试从RAM缓存获取
+                    modelCache.getFromRamCache(request.modelId)?.let { model ->
+                        // 提升到GPU缓存
+                        modelCache.putInGpuCache(request.modelId, model)
+                        updateLoadingState(request.modelId, ModelLoadingState.COMPLETED)
+                        return@async model
+                    }
+                    
+                    // 3. 尝试从磁盘缓存获取
+                    modelCache.getFromDiskCache(request.modelId)?.let { model ->
+                        // 提升到RAM和GPU缓存
+                        modelCache.putInRamCache(request.modelId, model)
+                        modelCache.putInGpuCache(request.modelId, model)
+                        updateLoadingState(request.modelId, ModelLoadingState.COMPLETED)
+                        return@async model
+                    }
+                    
+                    // 4. 从云端下载
+                    val model = modelCache.getFromCloudCache(request.modelId)
+                    if (model != null) {
+                        // 缓存到各级缓存
+                        modelCache.putInDiskCache(request.modelId, model)
+                        modelCache.putInRamCache(request.modelId, model)
+                        modelCache.putInGpuCache(request.modelId, model)
+                        
+                        updateLoadingState(request.modelId, ModelLoadingState.COMPLETED)
+                        return@async model
+                    }
+                    
+                    updateLoadingState(request.modelId, ModelLoadingState.FAILED)
+                    return@async null
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to load model ${request.modelId}", e)
+                    updateLoadingState(request.modelId, ModelLoadingState.FAILED)
+                    return@async null
+                } finally {
+                    activeLoads.decrementAndGet()
+                    loadingJobs.remove(request.modelId)
                 }
             }
             
-            expiredModels.forEach { modelId ->
-                unloadModel(modelId)
+            loadingJobs[request.modelId] = deferred
+            activeLoads.incrementAndGet()
+            
+            return deferred.await()
+        }
+        
+        private fun updateLoadingState(modelId: String, state: ModelLoadingState) {
+            val currentStates = _loadingStates.value.toMutableMap()
+            currentStates[modelId] = state
+            _loadingStates.value = currentStates
+        }
+        
+        fun cancelLoading(modelId: String) {
+            loadingJobs[modelId]?.cancel()
+            loadingJobs.remove(modelId)
+            updateLoadingState(modelId, ModelLoadingState.CANCELLED)
+        }
+        
+        fun getLoadingProgress(modelId: String): Float {
+            // 返回加载进度 (0.0 - 1.0)
+            return when (_loadingStates.value[modelId]) {
+                ModelLoadingState.LOADING -> 0.5f // 简化的进度
+                ModelLoadingState.COMPLETED -> 1.0f
+                else -> 0.0f
             }
         }
     }
     
     /**
-     * 清理所有资源
+     * 🔄 模型生命周期管理器
      */
-    fun cleanup() {
-        preloadJobs.values.forEach { it.cancel() }
-        preloadJobs.clear()
-        modelCache.evictAll()
-        modelStates.clear()
-        modelScope.cancel()
+    private inner class ModelLifecycleManager {
+        private val activeModels = ConcurrentHashMap<String, AIModel>()
+        private val modelUsageStats = ConcurrentHashMap<String, ModelUsageStats>()
+        
+        fun registerModel(modelId: String, model: AIModel) {
+            activeModels[modelId] = model
+            modelUsageStats[modelId] = ModelUsageStats(modelId)
+            Log.d(TAG, "Model $modelId registered")
+        }
+        
+        fun unregisterModel(modelId: String) {
+            activeModels.remove(modelId)?.let { model ->
+                model.release()
+                Log.d(TAG, "Model $modelId unregistered and released")
+            }
+        }
+        
+        fun recordUsage(modelId: String) {
+            modelUsageStats[modelId]?.let { stats ->
+                stats.usageCount++
+                stats.lastUsed = System.currentTimeMillis()
+            }
+        }
+        
+        fun getActiveModels(): List<String> {
+            return activeModels.keys.toList()
+        }
+        
+        fun optimizeMemory() {
+            // 移除最少使用的模型
+            val leastUsedModel = modelUsageStats.values
+                .filter { System.currentTimeMillis() - it.lastUsed > 300_000 } // 5分钟未使用
+                .minByOrNull { it.usageCount }
+            
+            leastUsedModel?.let {
+                unregisterModel(it.modelId)
+                modelCache.ramCache.remove(it.modelId)
+                Log.d(TAG, "Optimized memory by removing model ${it.modelId}")
+            }
+        }
     }
     
-    // ==================== 数据类定义 ====================
+    /**
+     * 📊 模型性能跟踪器
+     */
+    private inner class ModelPerformanceTracker {
+        private val performanceMetrics = ConcurrentHashMap<String, ModelPerformanceMetrics>()
+        
+        fun trackLoadTime(modelId: String, loadTime: Long) {
+            getOrCreateMetrics(modelId).loadTimes.add(loadTime)
+        }
+        
+        fun trackInferenceTime(modelId: String, inferenceTime: Long) {
+            getOrCreateMetrics(modelId).inferenceTimes.add(inferenceTime)
+        }
+        
+        fun trackMemoryUsage(modelId: String, memoryUsage: Long) {
+            getOrCreateMetrics(modelId).memoryUsage = memoryUsage
+        }
+        
+        private fun getOrCreateMetrics(modelId: String): ModelPerformanceMetrics {
+            return performanceMetrics.getOrPut(modelId) { 
+                ModelPerformanceMetrics(modelId) 
+            }
+        }
+        
+        fun getPerformanceReport(modelId: String): ModelPerformanceReport? {
+            val metrics = performanceMetrics[modelId] ?: return null
+            
+            return ModelPerformanceReport(
+                modelId = modelId,
+                averageLoadTime = metrics.loadTimes.average(),
+                averageInferenceTime = metrics.inferenceTimes.average(),
+                memoryUsage = metrics.memoryUsage,
+                totalInferences = metrics.inferenceTimes.size.toLong()
+            )
+        }
+        
+        fun getAllPerformanceReports(): List<ModelPerformanceReport> {
+            return performanceMetrics.keys.mapNotNull { getPerformanceReport(it) }
+        }
+    }
+    
+    // ==================== 数据类和枚举 ====================
     
     /**
-     * 模型配置
+     * AI模型接口
      */
-    data class ModelConfig(
-        val id: String,
-        val name: String,
-        val type: String,
-        val isLocal: Boolean,
-        val priority: ModelPriority,
-        val preloadOnStartup: Boolean,
-        val maxCacheTime: Long
+    interface AIModel {
+        val modelId: String
+        val modelType: ModelType
+        
+        suspend fun predict(input: Any): Any
+        fun loadToGpu()
+        fun release()
+        fun getModelSize(): Long
+        suspend fun saveToDisk(filePath: String)
+    }
+    
+    /**
+     * 模拟AI模型实现
+     */
+    private class SimulatedAIModel(
+        override val modelId: String,
+        override val modelType: ModelType
+    ) : AIModel {
+        
+        override suspend fun predict(input: Any): Any {
+            delay(100) // 模拟推理时间
+            return "Simulated result for $input"
+        }
+        
+        override fun loadToGpu() {
+            Log.d(TAG, "Model $modelId loaded to GPU")
+        }
+        
+        override fun release() {
+            Log.d(TAG, "Model $modelId released")
+        }
+        
+        override fun getModelSize(): Long = 50_000_000L // 50MB
+        
+        override suspend fun saveToDisk(filePath: String) {
+            delay(500) // 模拟保存时间
+            Log.d(TAG, "Model $modelId saved to $filePath")
+        }
+    }
+    
+    enum class ModelType {
+        CHAT,           // 对话模型
+        VOICE,          // 语音模型
+        VISION,         // 视觉模型
+        LOCAL,          // 本地模型
+        MULTIMODAL      // 多模态模型
+    }
+    
+    enum class LoadPriority {
+        LOW, NORMAL, HIGH, URGENT
+    }
+    
+    enum class ModelLoadingState {
+        IDLE, LOADING, COMPLETED, FAILED, CANCELLED
+    }
+    
+    data class LoadingRequest(
+        val modelId: String,
+        val modelType: ModelType,
+        val priority: LoadPriority
     )
     
+    data class ModelCacheEntry(
+        val modelId: String,
+        val filePath: String,
+        val timestamp: Long,
+        val size: Long,
+        var accessCount: Int = 0,
+        var lastAccess: Long = timestamp
+    )
+    
+    data class ModelUsageStats(
+        val modelId: String,
+        var usageCount: Int = 0,
+        var lastUsed: Long = System.currentTimeMillis()
+    )
+    
+    data class ModelPerformanceMetrics(
+        val modelId: String,
+        val loadTimes: MutableList<Long> = mutableListOf(),
+        val inferenceTimes: MutableList<Long> = mutableListOf(),
+        var memoryUsage: Long = 0
+    )
+    
+    data class ModelPerformanceReport(
+        val modelId: String,
+        val averageLoadTime: Double,
+        val averageInferenceTime: Double,
+        val memoryUsage: Long,
+        val totalInferences: Long
+    )
+    
+    data class CacheStats(
+        val gpuCacheSize: Int,
+        val ramCacheSize: Int,
+        val diskCacheSize: Int,
+        val totalCacheSize: Long
+    )
+    
+    // ==================== 公共API ====================
+    
     /**
-     * 模型优先级
+     * 🚀 预加载模型
      */
-    enum class ModelPriority {
-        LOW, MEDIUM, HIGH
+    fun preloadModel(modelId: String, modelType: ModelType = ModelType.CHAT, priority: LoadPriority = LoadPriority.HIGH) {
+        managerScope.launch {
+            try {
+                Log.d(TAG, "Preloading model: $modelId")
+                loadingManager.loadModel(modelId, modelType, priority)
+                Log.d(TAG, "Model $modelId preloaded successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to preload model $modelId", e)
+            }
+        }
     }
     
     /**
-     * 模型状态
+     * 🎯 获取模型
      */
-    enum class ModelState {
-        NOT_LOADED, LOADING, LOADED, ERROR
-    }
-    
-    /**
-     * AI模型基类
-     */
-    abstract class AIModel(
-        val id: String,
-        val name: String,
-        val loadTime: Long = System.currentTimeMillis()
-    ) {
-        abstract suspend fun process(input: String): String
-        abstract fun cleanup()
-    }
-    
-    /**
-     * 本地聊天模型实现
-     */
-    private class LocalChatModel(id: String, name: String) : AIModel(id, name) {
-        override suspend fun process(input: String): String {
-            // 模拟本地处理
-            delay(100)
-            return "Local response to: $input"
+    suspend fun getModel(modelId: String, modelType: ModelType = ModelType.CHAT): AIModel? {
+        performanceTracker.trackLoadTime(modelId, 0) // 开始计时
+        val startTime = System.currentTimeMillis()
+        
+        val model = loadingManager.loadModel(modelId, modelType)
+        
+        val loadTime = System.currentTimeMillis() - startTime
+        performanceTracker.trackLoadTime(modelId, loadTime)
+        
+        model?.let {
+            lifecycleManager.registerModel(modelId, it)
+            lifecycleManager.recordUsage(modelId)
         }
         
-        override fun cleanup() {
-            // 清理本地模型资源
+        return model
+    }
+    
+    /**
+     * 🤖 执行AI推理
+     */
+    suspend fun predict(modelId: String, input: Any): Any? {
+        val startTime = System.currentTimeMillis()
+        
+        return try {
+            val model = getModel(modelId) ?: return null
+            val result = model.predict(input)
+            
+            val inferenceTime = System.currentTimeMillis() - startTime
+            performanceTracker.trackInferenceTime(modelId, inferenceTime)
+            lifecycleManager.recordUsage(modelId)
+            
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Prediction failed for model $modelId", e)
+            null
         }
     }
     
     /**
-     * 在线聊天模型实现
+     * 🗑️ 释放模型
      */
-    private class OnlineChatModel(id: String, name: String) : AIModel(id, name) {
-        override suspend fun process(input: String): String {
-            // 模拟在线API调用
-            delay(200)
-            return "Online response to: $input"
-        }
-        
-        override fun cleanup() {
-            // 清理网络连接等
+    fun releaseModel(modelId: String) {
+        lifecycleManager.unregisterModel(modelId)
+    }
+    
+    /**
+     * 🧹 清理内存
+     */
+    fun trimMemory(level: Int) {
+        when (level) {
+            >= 80 -> { // TRIM_MEMORY_COMPLETE
+                modelCache.clearCache()
+                lifecycleManager.getActiveModels().forEach { modelId ->
+                    lifecycleManager.unregisterModel(modelId)
+                }
+                Log.d(TAG, "Complete memory trim executed")
+            }
+            >= 60 -> { // TRIM_MEMORY_MODERATE
+                lifecycleManager.optimizeMemory()
+                modelCache.evictOldestFromDiskCache()
+                Log.d(TAG, "Moderate memory trim executed")
+            }
+            >= 40 -> { // TRIM_MEMORY_BACKGROUND
+                lifecycleManager.optimizeMemory()
+                Log.d(TAG, "Background memory trim executed")
+            }
         }
     }
     
     /**
-     * TensorFlow Lite模型实现
+     * 📊 获取缓存统计
      */
-    private class TensorFlowLiteModel(id: String, name: String) : AIModel(id, name) {
-        override suspend fun process(input: String): String {
-            // 模拟TF Lite推理
-            delay(150)
-            return "TF Lite response to: $input"
-        }
-        
-        override fun cleanup() {
-            // 清理TF Lite解释器
+    fun getCacheStats(): CacheStats {
+        return modelCache.getCacheStats()
+    }
+    
+    /**
+     * 📊 获取性能报告
+     */
+    fun getPerformanceReport(modelId: String): ModelPerformanceReport? {
+        return performanceTracker.getPerformanceReport(modelId)
+    }
+    
+    /**
+     * 📊 获取所有性能报告
+     */
+    fun getAllPerformanceReports(): List<ModelPerformanceReport> {
+        return performanceTracker.getAllPerformanceReports()
+    }
+    
+    /**
+     * 🔧 初始化管理器
+     */
+    private fun initializeManager() {
+        // 启动后台清理任务
+        managerScope.launch {
+            while (isActive) {
+                try {
+                    delay(300_000) // 每5分钟执行一次
+                    lifecycleManager.optimizeMemory()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in background cleanup", e)
+                }
+            }
         }
     }
     
     /**
-     * ONNX模型实现
+     * 🔄 释放资源
      */
-    private class OnnxModel(id: String, name: String) : AIModel(id, name) {
-        override suspend fun process(input: String): String {
-            // 模拟ONNX推理
-            delay(120)
-            return "ONNX response to: $input"
+    fun shutdown() {
+        managerScope.cancel()
+        modelCache.clearCache()
+        lifecycleManager.getActiveModels().forEach { modelId ->
+            lifecycleManager.unregisterModel(modelId)
         }
-        
-        override fun cleanup() {
-            // 清理ONNX运行时
-        }
+        Log.d(TAG, "AIModelManager shutdown")
     }
     
     /**
-     * 语音模型实现
+     * 🔧 辅助函数：从磁盘加载模型
      */
-    private class VoiceModel(id: String, name: String, private val modelPath: String) : AIModel(id, name) {
-        override suspend fun process(input: String): String {
-            // 模拟语音处理
-            delay(180)
-            return "Voice response from $modelPath to: $input"
-        }
-        
-        override fun cleanup() {
-            // 清理语音模型资源
+    private suspend fun loadModelFromDisk(filePath: String, modelId: String): AIModel {
+        return withContext(Dispatchers.IO) {
+            delay(1000) // 模拟磁盘加载时间
+            SimulatedAIModel(modelId, ModelType.CHAT)
         }
     }
 }

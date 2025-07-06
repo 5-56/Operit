@@ -18,7 +18,7 @@ readonly NC='\033[0m' # No Color
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 readonly REPORTS_DIR="$PROJECT_ROOT/reports"
-readonly PACKAGE_NAME="com.ai.assistance.operit"
+# PACKAGE_NAME will be set in main function
 
 # 日志函数
 log_info() {
@@ -50,7 +50,7 @@ Operit AI 性能分析脚本
 
 选项:
   -h, --help              显示此帮助信息
-  -p, --package PACKAGE   指定应用包名 [默认: $PACKAGE_NAME]
+  -p, --package PACKAGE   指定应用包名 [默认: com.ai.assistance.operit]
   -o, --output DIR        指定输出目录 [默认: $REPORTS_DIR]
   -d, --duration SECONDS  监控持续时间 [默认: 60]
   -m, --memory            内存分析
@@ -436,7 +436,8 @@ EOF
 # 主函数
 main() {
     # 默认配置
-    PACKAGE_NAME="com.ai.assistance.operit"
+    local PACKAGE_NAME_DEFAULT="com.ai.assistance.operit"
+    PACKAGE_NAME="${PACKAGE_NAME:-$PACKAGE_NAME_DEFAULT}"
     DURATION=60
     DO_MEMORY=false
     DO_CPU=false
