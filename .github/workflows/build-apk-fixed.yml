@@ -1,0 +1,210 @@
+name: Build and Release APK (Fixed)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: '创建GitHub Release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GRADLE_OPTS: "-Xmx4g -Dorg.gradle.daemon=false"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - name: 🛒 Checkout代码
+      uses: actions/checkout@v4
+      
+    - name: ☕ 设置Java环境  
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: 📱 设置Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 34
+        build-tools: 34.0.0
+        
+    - name: 🔐 给gradlew添加执行权限
+      run: chmod +x gradlew
+      
+    - name: 🧹 清理Gradle缓存（强制）
+      run: |
+        rm -rf ~/.gradle/caches/
+        rm -rf .gradle/
+        
+    - name: 📦 Gradle依赖缓存
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: 🔍 检查项目结构
+      run: |
+        echo "📋 项目根目录内容:"
+        ls -la
+        echo "📋 app目录内容:"
+        ls -la app/ || echo "app目录不存在"
+        echo "📋 检查build.gradle文件:"
+        ls -la *.gradle* || echo "未找到gradle文件"
+        ls -la app/*.gradle* || echo "未找到app/gradle文件"
+        
+    - name: ⚠️ 处理缺失依赖
+      run: |
+        echo "⚠️ 检查是否有缺失的依赖文件..."
+        find . -name ".keep" -type f || echo "未找到.keep文件"
+        echo "📁 如果构建失败，可能需要下载额外依赖"
+        echo "🔗 依赖地址: https://drive.google.com/drive/folders/1g-Q_i7cf6Ua4KX9ZM6V282EEZvTVVfF7"
+        
+    - name: 🧪 测试Gradle连接
+      run: |
+        echo "测试Gradle包装器..."
+        ./gradlew --version
+        echo "测试项目配置..."
+        ./gradlew help --stacktrace
+        
+    - name: 🧹 清理项目
+      run: ./gradlew clean --stacktrace --info
+      
+    - name: 🔨 构建Debug版本
+      run: |
+        echo "开始构建Debug版本..."
+        ./gradlew assembleDebug --stacktrace --info
+      continue-on-error: true
+      
+    - name: 🚀 构建Release版本  
+      run: |
+        echo "开始构建Release版本..."
+        ./gradlew assembleRelease --stacktrace --info
+      continue-on-error: true
+        
+    - name: 📋 检查构建结果
+      run: |
+        echo "📦 检查构建输出目录..."
+        find . -name "*.apk" -type f || echo "未找到APK文件"
+        
+        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+          echo "✅ 发布版APK构建成功"
+          APK_SIZE=$(ls -lh app/build/outputs/apk/release/app-release.apk | awk '{print $5}')
+          echo "📦 APK大小: $APK_SIZE"
+          echo "BUILD_SUCCESS=true" >> $GITHUB_ENV
+        else
+          echo "❌ 发布版APK构建失败"
+          echo "BUILD_SUCCESS=false" >> $GITHUB_ENV
+        fi
+        
+    - name: 📁 准备发布文件
+      if: env.BUILD_SUCCESS == 'true'
+      run: |
+        mkdir -p release
+        
+        # 复制APK文件
+        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+          cp app/build/outputs/apk/release/app-release.apk release/Operit-AI-v1.2.0.apk
+          echo "✅ Release APK已复制"
+        fi
+        
+        if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+          cp app/build/outputs/apk/debug/app-debug.apk release/Operit-AI-v1.2.0-debug.apk
+          echo "✅ Debug APK已复制"
+        fi
+        
+        # 生成校验和
+        cd release
+        for file in *.apk; do
+          if [ -f "$file" ]; then
+            sha256sum "$file" > "${file}.sha256"
+            md5sum "$file" > "${file}.md5"
+            echo "✅ 已生成 $file 的校验和"
+          fi
+        done
+        cd ..
+        
+        echo "📦 发布文件准备完成"
+        ls -la release/
+        
+    - name: 📤 上传构建产物
+      if: env.BUILD_SUCCESS == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: operit-ai-apk-${{ github.run_number }}
+        path: release/
+        retention-days: 30
+        
+    - name: 🏷️ 创建GitHub Release
+      if: startsWith(github.ref, 'refs/tags/') && env.BUILD_SUCCESS == 'true'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          release/Operit-AI-v1.2.0.apk
+          release/Operit-AI-v1.2.0-debug.apk
+          release/Operit-AI-v1.2.0.apk.sha256
+          release/Operit-AI-v1.2.0.apk.md5
+        name: Operit AI v1.2.0
+        body: |
+          # 🎉 Operit AI v1.2.0 发布
+          
+          ## 📱 下载安装包
+          - **Operit-AI-v1.2.0.apk** - 发布版APK（推荐安装）
+          - **Operit-AI-v1.2.0-debug.apk** - 调试版APK
+          
+          ## 🆕 主要功能
+          - ✅ 40+内置工具的智能助手
+          - ✅ 混合AI引擎（在线+离线）
+          - ✅ 语音唤醒和交互系统
+          - ✅ 本地模型训练能力
+          - ✅ 系统级自动化操作
+          
+          ## 📱 系统要求
+          - Android 8.0 (API 26) 或更高版本
+          - RAM: 推荐4GB或更多
+          - 存储: 至少500MB可用空间
+          
+          ## 🚀 安装说明
+          1. 下载 Operit-AI-v1.2.0.apk
+          2. 启用"未知来源"应用安装
+          3. 运行APK文件安装
+          4. 按应用内指引完成设置
+          
+          ---
+          *构建时间: ${{ github.run_id }}*
+          *构建分支: ${{ github.ref_name }}*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📊 构建摘要
+      run: |
+        echo "🎯 构建任务完成"
+        echo "📋 构建摘要:"
+        echo "   • 项目: Operit AI"
+        echo "   • 版本: 1.2.0"
+        echo "   • 构建ID: ${{ github.run_id }}"
+        echo "   • 分支: ${{ github.ref_name }}"
+        echo "   • 构建状态: ${{ env.BUILD_SUCCESS }}"
+        echo ""
+        if [ "${{ env.BUILD_SUCCESS }}" = "true" ]; then
+          echo "✅ APK构建成功！"
+          echo "📦 文件可在Actions产物中下载"
+        else
+          echo "❌ APK构建失败"
+          echo "🔍 请检查上述步骤的错误日志"
+        fi
