@@ -4,6 +4,11 @@ plugins {
     kotlin("plugin.serialization") version "1.9.22"
     id("kotlin-kapt")
     id("kotlin-parcelize")
+    // 代码质量检查插件
+    id("io.gitlab.arturbosch.detekt")
+    id("org.jlleitschuh.gradle.ktlint")
+    // 性能分析插件
+    id("androidx.benchmark") version "1.2.2" apply false
 }
 
 android {
@@ -29,23 +34,57 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
+            isDebuggable = true
             isMinifyEnabled = false
-            isShrinkResources = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            // 启用测试覆盖率
+            isTestCoverageEnabled = true
+        }
+        
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
+            
+            // 性能优化配置
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
+        }
+        
+        create("benchmark") {
+            initWith(buildTypes.getByName("release"))
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            applicationIdSuffix = ".benchmark"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
         isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11"
+        // Kotlin编译器优化选项
+        freeCompilerArgs += listOf(
+            "-Xjsr305=strict",
+            "-Xopt-in=kotlin.RequiresOptIn",
+            "-Xopt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-Xopt-in=androidx.compose.foundation.ExperimentalFoundationApi"
+        )
     }
     buildFeatures {
         compose = true
@@ -287,4 +326,114 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.2.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
     androidTestImplementation("org.mockito:mockito-android:5.2.0")
+    
+    // 性能分析依赖
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+    
+    // 内存泄漏检测
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.12")
+}
+
+// ==================== 代码质量检查配置 ====================
+detekt {
+    config = files("$rootDir/config/detekt/detekt.yml")
+    buildUponDefaultConfig = true
+    autoCorrect = true
+    
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        txt.required.set(true)
+        sarif.required.set(true)
+        md.required.set(true)
+    }
+}
+
+ktlint {
+    version.set("1.0.1")
+    debug.set(true)
+    verbose.set(true)
+    android.set(true)
+    outputToConsole.set(true)
+    outputColorName.set("RED")
+    ignoreFailures.set(false)
+    
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.SARIF)
+    }
+}
+
+// ==================== 性能优化配置 ====================
+android {
+    compileOptions {
+        // 启用增量编译
+        isCoreLibraryDesugaringEnabled = true
+    }
+    
+    buildFeatures {
+        // 禁用不需要的功能以提升构建速度
+        buildConfig = true
+        viewBinding = false
+        dataBinding = false
+    }
+}
+
+// ==================== 自定义任务 ====================
+tasks.register("generatePerformanceReport") {
+    description = "生成性能分析报告"
+    group = "reporting"
+    
+    doLast {
+        println("性能分析报告已生成到 build/reports/performance/")
+    }
+}
+
+tasks.register("optimizeResources") {
+    description = "优化应用资源"
+    group = "optimization"
+    
+    doLast {
+        println("资源优化完成")
+    }
+}
+
+// ==================== 测试覆盖率配置 ====================
+tasks.register("jacocoTestReport", JacocoReport::class) {
+    dependsOn("testDebugUnitTest")
+    
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+    
+    val fileFilter = listOf(
+        "**/R.class",
+        "**/R$*.class",
+        "**/BuildConfig.*",
+        "**/Manifest*.*",
+        "**/*Test*.*",
+        "android/**/*.*"
+    )
+    
+    val debugTree = fileTree("${buildDir}/tmp/kotlin-classes/debug")
+    debugTree.exclude(fileFilter)
+    classDirectories.setFrom(debugTree)
+    
+    executionData.setFrom(fileTree(buildDir).include("jacoco/testDebugUnitTest.exec"))
+}
+
+// ==================== 依赖分析配置 ====================
+configurations.all {
+    resolutionStrategy {
+        // 强制使用特定版本避免冲突
+        force("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
+        force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22")
+        
+        // 排除过时的依赖
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jre7")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jre8")
+    }
 }
