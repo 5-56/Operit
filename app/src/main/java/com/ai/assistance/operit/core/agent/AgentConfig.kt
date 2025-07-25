@@ -9,5 +9,7 @@ data class AgentConfig(
     val showEachStep: Boolean = true,
     val preProcessHook: ((String) -> Unit)? = null,
     val postProcessHook: ((String, String) -> Unit)? = null,
-    val llmProvider: String = "openai" // 可选: openai/qwen/claude/local
+    val llmProvider: String = "openai", // 可选: openai/qwen/claude/local
+    val llmApiKey: String = "",
+    val llmEndpoint: String = ""
 )

@@ -1183,11 +1183,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val planSteps = planItemsDelegate.generatePlanForRequest(userRequest)
-                // 支持自定义 agent 配置和 LLM
                 val config = AgentConfig(maxIterations = maxIterations, showEachStep = true)
-                val llmService: LLMService = OpenAILLMService("YOUR_OPENAI_API_KEY")
-                // 调用 agentMain
-                val finalScript = AgentScriptGenerator.agentMain(userRequest, planSteps, config, llmService)
+                // 传递 context 以支持真实脚本执行
+                val finalScript = AgentScriptGenerator.agentMain(userRequest, planSteps, config, context)
                 uiStateDelegate.showPopupMessage("Agent 执行完成，最终脚本已保存并上传。\n\n$finalScript")
             } catch (e: Exception) {
                 Log.e(TAG, "Agent 自动化流程异常", e)

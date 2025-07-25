@@ -8,6 +8,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.*
@@ -366,10 +368,13 @@ fun AIChatScreen(
     var exportErrorMessage by remember { mutableStateOf<String?>(null) }
     var webContentDir by remember { mutableStateOf<File?>(null) }
 
-    // 在底部输入区增加 agent 按钮
+    // agent 过程信息展示
+    val agentSteps = remember { mutableStateListOf<String>() }
+    // agent 触发时清空历史
     val agentTrigger: () -> Unit = {
         val userInput = actualViewModel.userMessage.value
         if (userInput.isNotBlank()) {
+            agentSteps.clear()
             actualViewModel.runAgentForUserRequest(userInput)
         } else {
             actualViewModel.showToast("请输入需求后再启动Agent")
@@ -463,7 +468,14 @@ fun AIChatScreen(
                 Box(modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)) {
-                    // ChatScreenContent now fills this Box, and has the overlay on top of it.
+                    // agent 过程信息展示
+                    if (agentSteps.isNotEmpty()) {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().background(Color(0xFFF5F5F5))) {
+                            items(agentSteps) { step ->
+                                Text(step, modifier = Modifier.padding(8.dp), color = Color.DarkGray)
+                            }
+                        }
+                    }
                 ChatScreenContent(
                             paddingValues = PaddingValues(), // Padding is already handled by the parent Box
                         actualViewModel = actualViewModel,

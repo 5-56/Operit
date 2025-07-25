@@ -6,6 +6,10 @@ import com.ai.assistance.operit.core.agent.AgentConfig
 import com.ai.assistance.operit.core.agent.LLMService
 import com.ai.assistance.operit.core.agent.OpenAILLMService
 import com.ai.assistance.operit.core.agent.AgentScriptSaver
+import com.ai.assistance.operit.core.agent.QwenLLMService
+import com.ai.assistance.operit.core.agent.ClaudeLLMService
+import com.ai.assistance.operit.core.tools.javascript.JsEngine
+import android.content.Context
 
 /**
  * AgentScriptGenerator 负责根据用户需求和计划自动生成、优化 JavaScript 脚本。
@@ -50,31 +54,51 @@ object AgentScriptGenerator {
     }
 
     /**
-     * agent 主流程，支持自定义 config、llm、自动保存/上传
+     * 根据 config 选择 LLMService
+     */
+    fun getLLMService(config: AgentConfig): LLMService = when (config.llmProvider.lowercase()) {
+        "qwen" -> QwenLLMService(config.llmApiKey)
+        "claude" -> ClaudeLLMService(config.llmApiKey)
+        else -> OpenAILLMService(config.llmApiKey)
+    }
+
+    /**
+     * agent 主流程，支持自定义 config、llm、自动保存/上传、真实脚本执行与反馈
      */
     suspend fun agentMain(
         userRequest: String,
         planSteps: List<String>? = null,
         config: AgentConfig = AgentConfig(),
-        llmService: LLMService = OpenAILLMService("YOUR_OPENAI_API_KEY")
+        context: Context? = null
     ): String {
+        val llmService = getLLMService(config)
         config.preProcessHook?.invoke(userRequest)
         var script = llmService.generateScript(userRequest + (planSteps?.joinToString("\n") ?: ""))
         var lastFeedback = ""
         var result: String = ""
         var scriptPath: String? = null
         repeat(config.maxIterations) { iteration ->
-            // 可选：每轮保存脚本
+            // 每轮保存脚本
             scriptPath = AgentScriptSaver.saveScript(script, userRequest)
-            // TODO: 实际执行脚本并获取 result
-            result = "模拟执行结果: success"
+            // 实际执行脚本并获取 result
+            result = if (context != null) {
+                try {
+                    val jsEngine = JsEngine(context)
+                    val execResult = jsEngine.executeScriptFunction(script, "main", mapOf())
+                    execResult?.toString() ?: ""
+                } catch (e: Exception) {
+                    "脚本执行异常: ${e.message}"
+                }
+            } else {
+                "未提供 context，未执行脚本"
+            }
             config.postProcessHook?.invoke(script, result)
             if (config.showEachStep) {
                 println("[Agent] 第${iteration+1}轮脚本:\n$script\n结果:$result")
             }
             // 反馈给 LLM
             lastFeedback = "用户需求: $userRequest\n计划: $planSteps\n脚本: $script\n执行结果: $result"
-            val needOptimize = !result.contains("success")
+            val needOptimize = !result.contains("success") && !result.contains("成功")
             if (!needOptimize && config.autoTerminateOnSuccess) return@repeat
             script = llmService.optimizeScript(script, lastFeedback)
         }
