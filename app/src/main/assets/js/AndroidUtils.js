@@ -259,7 +259,7 @@ class Intent {
      */
     async start() {
         if (!this.action) {
-            throw new Error("Package name or action not set. Call setComponent(), setPackage() or setAction() first.");
+            throw new Error("Package name or action not set. Call setComponent(), setPackage() or setAction() first. [Intent.start]");
         }
 
         // Prepare component format
@@ -309,7 +309,7 @@ class Intent {
      */
     async sendBroadcast() {
         if (!this.action) {
-            throw new Error("Action not set. Call setAction() first.");
+            throw new Error("Action not set. Call setAction() first. [Intent.sendBroadcast]");
         }
 
         // Prepare extras with categories added
@@ -351,7 +351,7 @@ class Intent {
      */
     async startService() {
         if (!this.packageName || !this.component) {
-            throw new Error("Component not set. Call setComponent() first.");
+            throw new Error("Component not set. Call setComponent() first. [Intent.startService]");
         }
 
         // Prepare component format
@@ -607,7 +607,7 @@ class ContentProvider extends AdbExecutor {
      */
     async query(projection = null, selection = null, selectionArgs = null, sortOrder = null) {
         if (!this.uri) {
-            throw new Error("URI not set. Call setUri() first.");
+            throw new Error("URI not set. Call setUri() first. [ContentProvider.query]");
         }
 
         let command = ['content', 'query', '--uri', this.escapeShellArg(this.uri)];
@@ -664,7 +664,7 @@ class ContentProvider extends AdbExecutor {
      */
     async insert(values) {
         if (!this.uri) {
-            throw new Error("URI not set. Call setUri() first.");
+            throw new Error("URI not set. Call setUri() first. [ContentProvider.insert]");
         }
 
         let command = ['content', 'insert', '--uri', this.escapeShellArg(this.uri)];
@@ -686,7 +686,7 @@ class ContentProvider extends AdbExecutor {
      */
     async update(values, selection = null, selectionArgs = null) {
         if (!this.uri) {
-            throw new Error("URI not set. Call setUri() first.");
+            throw new Error("URI not set. Call setUri() first. [ContentProvider.update]");
         }
 
         let command = ['content', 'update', '--uri', this.escapeShellArg(this.uri)];
@@ -717,7 +717,7 @@ class ContentProvider extends AdbExecutor {
      */
     async delete(selection = null, selectionArgs = null) {
         if (!this.uri) {
-            throw new Error("URI not set. Call setUri() first.");
+            throw new Error("URI not set. Call setUri() first. [ContentProvider.delete]");
         }
 
         let command = ['content', 'delete', '--uri', this.escapeShellArg(this.uri)];
@@ -795,7 +795,7 @@ class SystemManager extends AdbExecutor {
     async getSetting(namespace, key) {
         // Validate namespace
         if (!['system', 'secure', 'global'].includes(namespace)) {
-            throw new Error('Invalid namespace. Must be system, secure, or global.');
+            throw new Error('Invalid namespace. Must be system, secure, or global. [SystemManager.getSetting]');
         }
 
         const output = await this.executeShell(`settings get ${namespace} ${key}`);
@@ -812,7 +812,7 @@ class SystemManager extends AdbExecutor {
     async setSetting(namespace, key, value) {
         // Validate namespace
         if (!['system', 'secure', 'global'].includes(namespace)) {
-            throw new Error('Invalid namespace. Must be system, secure, or global.');
+            throw new Error('Invalid namespace. Must be system, secure, or global. [SystemManager.setSetting]');
         }
 
         return this.executeShell(`settings put ${namespace} ${key} ${this.escapeShellArg(value)}`);
@@ -826,7 +826,7 @@ class SystemManager extends AdbExecutor {
     async listSettings(namespace) {
         // Validate namespace
         if (!['system', 'secure', 'global'].includes(namespace)) {
-            throw new Error('Invalid namespace. Must be system, secure, or global.');
+            throw new Error('Invalid namespace. Must be system, secure, or global. [SystemManager.listSettings]');
         }
 
         const output = await this.executeShell(`settings list ${namespace}`);
@@ -947,7 +947,7 @@ class DeviceController extends AdbExecutor {
         };
 
         if (!validStreams[stream]) {
-            throw new Error('Invalid stream type. Must be music, call, ring, alarm, or notification.');
+            throw new Error('Invalid stream type. Must be music, call, ring, alarm, or notification. [DeviceController.setVolume]');
         }
 
         return this.executeShell(`media volume --stream ${validStreams[stream]} --set ${volume}`);

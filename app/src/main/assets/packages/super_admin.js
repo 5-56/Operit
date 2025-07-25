@@ -54,7 +54,7 @@ const superAdmin = (function () {
     async function terminal(params) {
         try {
             if (!params.command) {
-                throw new Error("命令不能为空");
+                throw new Error("命令不能为空 [super_admin.runCommand]");
             }
             const command = params.command;
             const sessionId = params.sessionId;
@@ -73,8 +73,8 @@ const superAdmin = (function () {
             };
         }
         catch (error) {
-            console.error(`[terminal] 错误: ${error.message}`);
-            console.error(error.stack);
+            console.error(`[terminal] 错误: ${error.message} [super_admin.terminal]`);
+            console.error(error.stack, '[super_admin.terminal]');
             throw error;
         }
     }
@@ -86,7 +86,7 @@ const superAdmin = (function () {
     async function shell(params) {
         try {
             if (!params.command) {
-                throw new Error("命令不能为空");
+                throw new Error("命令不能为空 [super_admin.shellCommand]");
             }
             const command = params.command;
             console.log(`执行Shell命令: ${command}`);
@@ -99,8 +99,8 @@ const superAdmin = (function () {
             };
         }
         catch (error) {
-            console.error(`[shell] 错误: ${error.message}`);
-            console.error(error.stack);
+            console.error(`[shell] 错误: ${error.message} [super_admin.shell]`);
+            console.error(error.stack, '[super_admin.shell]');
             throw error;
         }
     }

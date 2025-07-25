@@ -295,7 +295,7 @@ class Response {
                 return headersString;
             }
         } catch (e) {
-            console.error('Error parsing headers:', e);
+            console.error('Error parsing headers:', e, '[OkHttp3.parseHeaders]');
         }
         return headers;
     }
@@ -305,7 +305,7 @@ class Response {
         try {
             return JSON.parse(this.content);
         } catch (e) {
-            throw new Error(`Failed to parse response as JSON: ${e.message}`);
+            throw new Error(`Failed to parse response as JSON: ${e.message} [OkHttp3.parseJsonResponse]`);
         }
     }
 

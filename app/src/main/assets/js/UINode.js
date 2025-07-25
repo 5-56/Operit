@@ -216,7 +216,7 @@ class UINode {
                 };
             }
         } catch (e) {
-            console.error("Error parsing bounds:", e);
+            console.error("Error parsing bounds:", e, '[UINode.parseBounds]');
         }
         return undefined;
     }
@@ -346,7 +346,7 @@ class UINode {
         }
 
         // Invalid criteria
-        console.error("Invalid search criteria:", criteria);
+        console.error("Invalid search criteria:", criteria, '[UINode.search]');
         return undefined;
     }
 
@@ -369,7 +369,7 @@ class UINode {
         }
 
         // Invalid criteria
-        console.error("Invalid search criteria:", criteria);
+        console.error("Invalid search criteria:", criteria, '[UINode.search]');
         return [];
     }
 
@@ -620,7 +620,7 @@ class UINode {
             return Tools.UI.clickElement({ contentDesc: this.contentDesc });
         }
 
-        throw new Error("Cannot click element: no suitable identifier found");
+        throw new Error("Cannot click element: no suitable identifier found [UINode.click]");
     }
 
     /**

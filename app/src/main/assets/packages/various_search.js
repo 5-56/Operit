@@ -130,7 +130,7 @@ const various_search = (function () {
                             }
                             // 检查转换结果是否为有效数字
                             if (isNaN(result[key])) {
-                                throw new Error(`参数 ${key} 无法转换为数字: ${value}`);
+                                throw new Error(`参数 ${key} 无法转换为数字: ${value} [various_search.toNumber]`);
                             }
                         }
                         else {
@@ -148,7 +148,7 @@ const various_search = (function () {
                                 result[key] = false;
                             }
                             else {
-                                throw new Error(`参数 ${key} 无法转换为布尔值: ${value}`);
+                                throw new Error(`参数 ${key} 无法转换为布尔值: ${value} [various_search.toBoolean]`);
                             }
                         }
                         else {
@@ -161,11 +161,11 @@ const various_search = (function () {
                             try {
                                 result[key] = JSON.parse(value);
                                 if (!Array.isArray(result[key])) {
-                                    throw new Error('解析结果不是数组');
+                                    throw new Error('解析结果不是数组 [various_search.toArray]');
                                 }
                             }
                             catch (e) {
-                                throw new Error(`参数 ${key} 无法转换为数组: ${value}`);
+                                throw new Error(`参数 ${key} 无法转换为数组: ${value} [various_search.toArray]`);
                             }
                         }
                         else {
@@ -178,11 +178,11 @@ const various_search = (function () {
                             try {
                                 result[key] = JSON.parse(value);
                                 if (Array.isArray(result[key]) || typeof result[key] !== 'object') {
-                                    throw new Error('解析结果不是对象');
+                                    throw new Error('解析结果不是对象 [various_search.toObject]');
                                 }
                             }
                             catch (e) {
-                                throw new Error(`参数 ${key} 无法转换为对象: ${value}`);
+                                throw new Error(`参数 ${key} 无法转换为对象: ${value} [various_search.toObject]`);
                             }
                         }
                         else {
@@ -195,7 +195,7 @@ const various_search = (function () {
                 }
             }
             catch (error) {
-                console.error(`参数类型转换错误: ${error.message}`);
+                console.error(`参数类型转换错误: ${error.message} [various_search.typeCast]`);
                 // 转换失败时保留原始值
                 result[key] = value;
             }
@@ -237,9 +237,9 @@ const various_search = (function () {
         }
         catch (error) {
             // 详细记录错误信息
-            console.error(`函数 ${func.name || '匿名函数'} 执行失败!`);
-            console.error(`错误信息: ${error.message}`);
-            console.error(`错误堆栈: ${error.stack}`);
+            console.error(`函数 ${func.name || '匿名函数'} 执行失败! [various_search.funcExec]`);
+            console.error(`错误信息: ${error.message} [various_search.funcExec]`);
+            console.error(`错误堆栈: ${error.stack} [various_search.funcExec]`);
             // 处理错误
             complete({
                 success: false,
