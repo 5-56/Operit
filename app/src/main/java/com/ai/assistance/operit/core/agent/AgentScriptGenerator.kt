@@ -2,6 +2,10 @@ package com.ai.assistance.operit.core.agent
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.ai.assistance.operit.core.agent.AgentConfig
+import com.ai.assistance.operit.core.agent.LLMService
+import com.ai.assistance.operit.core.agent.OpenAILLMService
+import com.ai.assistance.operit.core.agent.AgentScriptSaver
 
 /**
  * AgentScriptGenerator 负责根据用户需求和计划自动生成、优化 JavaScript 脚本。
@@ -43,5 +47,39 @@ object AgentScriptGenerator {
             $lastScript
             // TODO: 根据反馈进一步优化脚本
         """.trimIndent()
+    }
+
+    /**
+     * agent 主流程，支持自定义 config、llm、自动保存/上传
+     */
+    suspend fun agentMain(
+        userRequest: String,
+        planSteps: List<String>? = null,
+        config: AgentConfig = AgentConfig(),
+        llmService: LLMService = OpenAILLMService("YOUR_OPENAI_API_KEY")
+    ): String {
+        config.preProcessHook?.invoke(userRequest)
+        var script = llmService.generateScript(userRequest + (planSteps?.joinToString("\n") ?: ""))
+        var lastFeedback = ""
+        var result: String = ""
+        var scriptPath: String? = null
+        repeat(config.maxIterations) { iteration ->
+            // 可选：每轮保存脚本
+            scriptPath = AgentScriptSaver.saveScript(script, userRequest)
+            // TODO: 实际执行脚本并获取 result
+            result = "模拟执行结果: success"
+            config.postProcessHook?.invoke(script, result)
+            if (config.showEachStep) {
+                println("[Agent] 第${iteration+1}轮脚本:\n$script\n结果:$result")
+            }
+            // 反馈给 LLM
+            lastFeedback = "用户需求: $userRequest\n计划: $planSteps\n脚本: $script\n执行结果: $result"
+            val needOptimize = !result.contains("success")
+            if (!needOptimize && config.autoTerminateOnSuccess) return@repeat
+            script = llmService.optimizeScript(script, lastFeedback)
+        }
+        // 最终保存并上传
+        scriptPath?.let { AgentScriptSaver.autoGitUpload(it, "auto: agent 脚本更新") }
+        return script
     }
 }
