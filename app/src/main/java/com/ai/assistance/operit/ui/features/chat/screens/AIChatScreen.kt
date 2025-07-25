@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.PlayArrow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -365,6 +366,16 @@ fun AIChatScreen(
     var exportErrorMessage by remember { mutableStateOf<String?>(null) }
     var webContentDir by remember { mutableStateOf<File?>(null) }
 
+    // 在底部输入区增加 agent 按钮
+    val agentTrigger: () -> Unit = {
+        val userInput = actualViewModel.userMessage.value
+        if (userInput.isNotBlank()) {
+            actualViewModel.runAgentForUserRequest(userInput)
+        } else {
+            actualViewModel.showToast("请输入需求后再启动Agent")
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
                 containerColor = Color.Transparent,
@@ -374,52 +385,36 @@ fun AIChatScreen(
                 bottomBar = {
                     // 只在不显示配置界面时显示底部输入框
                     if (!shouldShowConfig) {
-                        // ChatInputSection is back in the bottomBar to reserve space
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            // 原有输入区
                             ChatInputSection(
-                                    actualViewModel = actualViewModel,
-                                    userMessage = userMessage,
-                                    onUserMessageChange = { actualViewModel.updateUserMessage(it) },
-                                    onSendMessage = {
-                                        actualViewModel.sendUserMessage()
-                                        // 在发送消息后重置附件面板状态
-                                        actualViewModel.resetAttachmentPanelState()
-                                    },
-                                    onCancelMessage = { actualViewModel.cancelCurrentMessage() },
-                                    isLoading = isLoading,
-                                    inputState = inputProcessingState,
-                                    allowTextInputWhileProcessing = true,
-                                    onAttachmentRequest = { filePath ->
-                                        // 处理附件 - 现在使用文件路径而不是Uri
-                                        actualViewModel.handleAttachment(filePath)
-                                    },
-                                    attachments = attachments,
-                                    onRemoveAttachment = { filePath ->
-                                        // 删除附件 - 现在使用文件路径而不是Uri
-                                        actualViewModel.removeAttachment(filePath)
-                                    },
-                                    onInsertAttachment = { attachment: AttachmentInfo ->
-                                        // 在光标位置插入附件引用
-                                        actualViewModel.insertAttachmentReference(attachment)
-                                    },
-                                    onAttachScreenContent = {
-                                        // 添加屏幕内容附件
-                                        actualViewModel.captureScreenContent()
-                                    },
-                                    onAttachNotifications = {
-                                        // 添加当前通知附件
-                                        actualViewModel.captureNotifications()
-                                    },
-                                    onAttachLocation = {
-                                        // 添加当前位置附件
-                                        actualViewModel.captureLocation()
-                                    },
-                                    hasBackgroundImage = hasBackgroundImage,
-                                    // 传递附件面板状态
-                                    externalAttachmentPanelState = attachmentPanelState,
-                                    onAttachmentPanelStateChange = { newState ->
-                                        actualViewModel.updateAttachmentPanelState(newState)
-                                    }
+                                actualViewModel = actualViewModel,
+                                userMessage = userMessage,
+                                onUserMessageChange = { actualViewModel.updateUserMessage(it) },
+                                onSendMessage = {
+                                    actualViewModel.sendUserMessage()
+                                    actualViewModel.resetAttachmentPanelState()
+                                },
+                                onCancelMessage = { actualViewModel.cancelCurrentMessage() },
+                                isLoading = isLoading,
+                                inputState = inputProcessingState,
+                                allowTextInputWhileProcessing = true,
+                                onAttachmentRequest = { filePath -> actualViewModel.handleAttachment(filePath) },
+                                attachments = attachments,
+                                onRemoveAttachment = { filePath -> actualViewModel.removeAttachment(filePath) },
+                                onInsertAttachment = { attachment: AttachmentInfo -> actualViewModel.insertAttachmentReference(attachment) },
+                                onAttachScreenContent = { actualViewModel.captureScreenContent() },
+                                onAttachNotifications = { actualViewModel.captureNotifications() },
+                                onAttachLocation = { actualViewModel.captureLocation() },
+                                hasBackgroundImage = hasBackgroundImage,
+                                externalAttachmentPanelState = attachmentPanelState,
+                                onAttachmentPanelStateChange = { newState -> actualViewModel.updateAttachmentPanelState(newState) }
                             )
+                            // Agent 触发按钮
+                            IconButton(onClick = agentTrigger, modifier = Modifier.align(Alignment.CenterVertically)) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Agent 自动化", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     }
                 },
                 floatingActionButton = {

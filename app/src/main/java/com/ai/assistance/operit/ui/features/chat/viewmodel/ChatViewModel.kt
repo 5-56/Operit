@@ -13,6 +13,8 @@ import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.invitation.InvitationManager
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.agent.AgentScriptGenerator
+import com.ai.assistance.operit.core.tools.javascript.JsEngine
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -1165,6 +1168,56 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         } else {
             // Directly launch fullscreen voice mode
             launchFloatingModeIn(FloatingMode.FULLSCREEN, colorScheme, typography)
+        }
+    }
+
+    /**
+     * Agent 自动化主流程：理解需求、生成计划、生成脚本、执行、反馈、优化
+     * @param userRequest 用户需求
+     * @param maxIterations 最大优化轮数，默认3
+     */
+    fun runAgentForUserRequest(userRequest: String, maxIterations: Int = 3) {
+        viewModelScope.launch {
+            try {
+                // 1. 生成计划（可调用 LLM 或用现有 planItemsDelegate）
+                val planSteps = planItemsDelegate.generatePlanForRequest(userRequest)
+
+                // 2. 生成初始脚本
+                var script = AgentScriptGenerator.generateScript(userRequest, planSteps)
+                var lastFeedback = ""
+                var result: Any? = null
+
+                // 3. 优化循环
+                repeat(maxIterations) { iteration ->
+                    // 3.1 执行脚本
+                    val jsEngine = JsEngine(context)
+                    result = withContext(Dispatchers.IO) {
+                        jsEngine.executeScriptFunction(script, "main", mapOf())
+                    }
+
+                    // 3.2 反馈给 LLM 评价
+                    val feedback = planItemsDelegate.evaluateScriptResult(userRequest, planSteps, script, result)
+
+                    // 3.3 判断是否需要优化
+                    if (feedback.contains("满意") || feedback.contains("无需优化") || feedback.contains("success":true")) {
+                        // 满意则终止
+                        break
+                    } else {
+                        // 需要优化，生成新脚本
+                        script = AgentScriptGenerator.optimizeScript(script, feedback)
+                        lastFeedback = feedback
+                    }
+                }
+
+                // 4. 展示最终结果
+                uiStateDelegate.showPopupMessage("Agent 执行完成，结果：$result")
+
+                // 5. 可选：保存脚本到本地并上传到仓库
+                // saveAndUploadScript(script, userRequest)
+            } catch (e: Exception) {
+                Log.e(TAG, "Agent 自动化流程异常", e)
+                uiStateDelegate.showErrorMessage("Agent 执行失败: ${e.message}")
+            }
         }
     }
 
