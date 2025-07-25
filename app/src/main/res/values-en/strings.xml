@@ -21,6 +21,7 @@
     <string name="nav_toolbox">Toolbox</string>
     <string name="nav_item_agreement">User Agreement</string>
     <string name="nav_help">Help Center</string>
+    <string name="nav_agent">Smart Agent</string>
     <string name="menu">Menu</string>
     <string name="token_config">Get API Key</string>
     

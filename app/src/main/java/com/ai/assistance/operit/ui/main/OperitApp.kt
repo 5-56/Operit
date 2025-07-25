@@ -146,6 +146,7 @@ fun OperitApp(initialNavItem: NavItem = NavItem.AiChat, toolHandler: AIToolHandl
                             "AI功能",
                             listOf(
                                     NavItem.AiChat,
+                                    NavItem.Agent,
                                     NavItem.AssistantConfig,
                                     NavItem.Packages,
                                     NavItem.MemoryBase,

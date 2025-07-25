@@ -53,7 +53,8 @@ enum class ToolCategory {
     NETWORK,             // Network operations (HTTP requests)
     UI_AUTOMATION,       // UI automation (clicks, touches)
     FILE_READ,           // File reading operations
-    FILE_WRITE;          // File writing/deletion operations
+    FILE_WRITE,          // File writing/deletion operations
+    AI_AGENT;            // AI Agent operations (intelligent task execution)
 
     companion object {
         fun getDefaultPermissionLevel(category: ToolCategory): PermissionLevel {
@@ -63,6 +64,7 @@ enum class ToolCategory {
                 UI_AUTOMATION -> PermissionLevel.CAUTION
                 FILE_READ -> PermissionLevel.ALLOW
                 FILE_WRITE -> PermissionLevel.ASK
+                AI_AGENT -> PermissionLevel.ALLOW
             }
         }
     }
