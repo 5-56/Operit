@@ -42,6 +42,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -227,6 +229,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 文件选择相关回调
     private var fileChooserCallback: ((Int, Intent?) -> Unit)? = null
+
+    private var agentJob: Job? = null
 
     init {
         // Initialize delegates in correct order to avoid circular references
@@ -1180,18 +1184,25 @@ class ChatViewModel(private val context: Context) : ViewModel() {
      * @param maxIterations 最大优化轮数，默认3
      */
     fun runAgentForUserRequest(userRequest: String, maxIterations: Int = 3) {
-        viewModelScope.launch {
+        agentJob?.cancel()
+        agentJob = viewModelScope.launch {
             try {
                 val planSteps = planItemsDelegate.generatePlanForRequest(userRequest)
                 val config = AgentConfig(maxIterations = maxIterations, showEachStep = true)
-                // 传递 context 以支持真实脚本执行
                 val finalScript = AgentScriptGenerator.agentMain(userRequest, planSteps, config, context)
                 uiStateDelegate.showPopupMessage("Agent 执行完成，最终脚本已保存并上传。\n\n$finalScript")
             } catch (e: Exception) {
-                Log.e(TAG, "Agent 自动化流程异常", e)
-                uiStateDelegate.showErrorMessage("Agent 执行失败: ${e.message}")
+                if (e is CancellationException) {
+                    uiStateDelegate.showToast("Agent 任务已中断")
+                } else {
+                    Log.e(TAG, "Agent 自动化流程异常", e)
+                    uiStateDelegate.showErrorMessage("Agent 执行失败: ${e.message}")
+                }
             }
         }
+    }
+    fun interruptAgent() {
+        agentJob?.cancel()
     }
 
     override fun onCleared() {

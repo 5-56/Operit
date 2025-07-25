@@ -48,6 +48,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.PlayArrow
+import com.ai.assistance.operit.ui.features.chat.screens.AgentConfigDialog
+import com.ai.assistance.operit.core.agent.AgentConfig
+import com.ai.assistance.operit.core.agent.AgentScriptSaver
+import androidx.compose.material.icons.filled.Stop
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -370,16 +374,24 @@ fun AIChatScreen(
 
     // agent 过程信息展示
     val agentSteps = remember { mutableStateListOf<String>() }
+    // agent 配置弹窗
+    var showAgentConfigDialog by remember { mutableStateOf(false) }
+    var agentConfig by remember { mutableStateOf(AgentConfig()) }
     // agent 触发时清空历史
     val agentTrigger: () -> Unit = {
         val userInput = actualViewModel.userMessage.value
         if (userInput.isNotBlank()) {
             agentSteps.clear()
-            actualViewModel.runAgentForUserRequest(userInput)
+            actualViewModel.runAgentForUserRequest(userInput, agentConfig.maxIterations)
         } else {
             actualViewModel.showToast("请输入需求后再启动Agent")
         }
     }
+
+    // agent 历史脚本弹窗
+    var showHistoryDialog by remember { mutableStateOf(false) }
+    var historyFiles by remember { mutableStateOf(listOf<File>()) }
+    var selectedHistoryContent by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -418,6 +430,21 @@ fun AIChatScreen(
                             // Agent 触发按钮
                             IconButton(onClick = agentTrigger, modifier = Modifier.align(Alignment.CenterVertically)) {
                                 Icon(Icons.Default.PlayArrow, contentDescription = "Agent 自动化", tint = MaterialTheme.colorScheme.primary)
+                            }
+                            // agent 配置按钮
+                            IconButton(onClick = { showAgentConfigDialog = true }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                                Icon(Icons.Default.Settings, contentDescription = "Agent 配置", tint = MaterialTheme.colorScheme.primary)
+                            }
+                            // agent 历史按钮
+                            IconButton(onClick = {
+                                historyFiles = AgentScriptSaver.listHistory()
+                                showHistoryDialog = true
+                            }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                                Icon(Icons.Default.History, contentDescription = "Agent 历史", tint = MaterialTheme.colorScheme.primary)
+                            }
+                            // agent 中断按钮
+                            IconButton(onClick = { actualViewModel.interruptAgent() }, modifier = Modifier.align(Alignment.CenterVertically)) {
+                                Icon(Icons.Default.Stop, contentDescription = "中断Agent", tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
@@ -658,6 +685,50 @@ fun AIChatScreen(
                     onOpenFile = { path ->
                         // Share or open file logic
                     }
+            )
+        }
+
+        // agent 配置弹窗
+        if (showAgentConfigDialog) {
+            AgentConfigDialog(
+                initialConfig = agentConfig,
+                onDismiss = { showAgentConfigDialog = false },
+                onConfirm = {
+                    agentConfig = it
+                    showAgentConfigDialog = false
+                }
+            )
+        }
+
+        if (showHistoryDialog) {
+            AlertDialog(
+                onDismissRequest = { showHistoryDialog = false },
+                title = { Text("Agent 历史脚本") },
+                text = {
+                    Column {
+                        historyFiles.forEach { file ->
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(file.name, modifier = Modifier.weight(1f))
+                                Button(onClick = { selectedHistoryContent = AgentScriptSaver.readScript(file) }) { Text("查看") }
+                                Button(onClick = {
+                                    AgentScriptSaver.rollbackTo(file)
+                                    showHistoryDialog = false
+                                }) { Text("回滚") }
+                                Button(onClick = {
+                                    AgentScriptSaver.deleteScript(file)
+                                    historyFiles = AgentScriptSaver.listHistory()
+                                }) { Text("删除") }
+                            }
+                        }
+                        if (selectedHistoryContent.isNotBlank()) {
+                            Text("内容:", style = MaterialTheme.typography.labelMedium)
+                            Text(selectedHistoryContent, modifier = Modifier.verticalScroll(rememberScrollState()))
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { showHistoryDialog = false }) { Text("关闭") }
+                }
             )
         }
     }

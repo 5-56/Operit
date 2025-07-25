@@ -41,4 +41,28 @@ object AgentScriptSaver {
             e.printStackTrace()
         }
     }
+
+    /**
+     * 获取所有历史脚本文件（按时间倒序）
+     */
+    fun listHistory(): List<File> = scriptDir.listFiles()?.sortedByDescending { it.lastModified() } ?: emptyList()
+
+    /**
+     * 读取指定历史脚本内容
+     */
+    fun readScript(file: File): String = file.readText()
+
+    /**
+     * 删除指定历史脚本
+     */
+    fun deleteScript(file: File) { file.delete() }
+
+    /**
+     * 回滚到指定历史脚本（复制为最新）
+     */
+    fun rollbackTo(file: File): String {
+        val newFile = File(scriptDir, "agent_rollback_${System.currentTimeMillis()}.js")
+        file.copyTo(newFile)
+        return newFile.absolutePath
+    }
 }
