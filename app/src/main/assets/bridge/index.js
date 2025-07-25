@@ -118,7 +118,7 @@ class McpBridge {
             fs.writeFileSync(this.registryPath, JSON.stringify(registry, null, 2), 'utf8');
         }
         catch (e) {
-            console.error(`Failed to save registry: ${e}`);
+            console.error(`Failed to save registry: ${e} [bridge.index.saveRegistry]`);
         }
     }
     /**
@@ -204,12 +204,12 @@ class McpBridge {
             // 处理标准错误
             (_b = mcpProcess.stderr) === null || _b === void 0 ? void 0 : _b.on('data', (data) => {
                 const errorText = data.toString().trim();
-                console.error(`MCP process error from ${serviceName}: ${errorText}`);
+                console.error(`MCP process error from ${serviceName}: ${errorText} [bridge.index.mcpProcessError]`);
                 this.mcpErrors.set(serviceName, errorText);
             });
             // 处理进程错误
             mcpProcess.on('error', (error) => {
-                console.error(`MCP process error for ${serviceName}: ${error.message}`);
+                console.error(`MCP process error for ${serviceName}: ${error.message} [bridge.index.mcpProcessError]`);
                 this.mcpProcesses.delete(serviceName);
                 // 保持服务处于就绪状态，以允许重新连接
                 this.serviceReadyMap.set(serviceName, true);
@@ -224,7 +224,7 @@ class McpBridge {
             setTimeout(() => this.fetchMcpTools(serviceName), 1000);
         }
         catch (error) {
-            console.error(`Failed to start MCP process for ${serviceName}: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(`Failed to start MCP process for ${serviceName}: ${error instanceof Error ? error.message : String(error)} [bridge.index.startMcpProcess]`);
             // 标记服务为就绪状态
             this.serviceReadyMap.set(serviceName, true);
         }
@@ -255,7 +255,7 @@ class McpBridge {
             this.serviceReadyMap.set(serviceName, true);
         }
         catch (error) {
-            console.error(`Error fetching tools for ${serviceName}: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(`Error fetching tools for ${serviceName}: ${error instanceof Error ? error.message : String(error)} [bridge.index.fetchTools]`);
             this.mcpToolsMap.set(serviceName, []);
             this.serviceReadyMap.set(serviceName, true);
         }
@@ -308,7 +308,7 @@ class McpBridge {
             }
         }
         catch (e) {
-            console.error(`Error handling MCP response from ${serviceName}: ${e instanceof Error ? e.message : String(e)}`);
+            console.error(`Error handling MCP response from ${serviceName}: ${e instanceof Error ? e.message : String(e)} [bridge.index.handleMcpResponse]`);
             // 不要崩溃服务器
             this.mcpToolsMap.set(serviceName, []);
         }
@@ -726,7 +726,7 @@ class McpBridge {
             }
         }
         catch (error) {
-            console.error(`Error handling tool call for ${serviceName}: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(`Error handling tool call for ${serviceName}: ${error instanceof Error ? error.message : String(error)} [bridge.index.handleToolCall]`);
             // 发送错误响应
             const response = {
                 id,
@@ -817,7 +817,7 @@ class McpBridge {
                     }
                 }
                 catch (e) {
-                    console.error(`Failed to parse client message: ${e}`);
+                    console.error(`Failed to parse client message: ${e} [bridge.index.parseClientMessage]`);
                     // 发送错误响应
                     socket.write(JSON.stringify({
                         jsonrpc: '2.0',
@@ -847,7 +847,7 @@ class McpBridge {
             });
             // 处理客户端错误
             socket.on('error', (err) => {
-                console.error(`Client error: ${err.message}`);
+                console.error(`Client error: ${err.message} [bridge.index.clientError]`);
                 this.activeConnections.delete(socket);
             });
         });
@@ -857,7 +857,7 @@ class McpBridge {
         });
         // 处理服务器错误
         this.server.on('error', (err) => {
-            console.error(`Server error: ${err.message}`);
+            console.error(`Server error: ${err.message} [bridge.index.serverError]`);
         });
         // 处理进程信号
         process.on('SIGINT', () => this.shutdown());

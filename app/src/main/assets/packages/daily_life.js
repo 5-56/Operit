@@ -181,8 +181,8 @@ const dailyLife = (function () {
             };
         }
         catch (error) {
-            console.error(`[get_current_date] 错误: ${error.message}`);
-            console.error(error.stack);
+            console.error(`[get_current_date] 错误: ${error.message} [daily_life.get_current_date]`);
+            console.error(error.stack, '[daily_life.get_current_date]');
             throw error;
         }
     }
@@ -215,7 +215,7 @@ const dailyLife = (function () {
             };
         }
         catch (error) {
-            throw new Error(`Failed to get device status: ${error.message}`);
+            throw new Error(`Failed to get device status: ${error.message} [daily_life.getDeviceStatus]`);
         }
     }
     /**
@@ -248,9 +248,9 @@ const dailyLife = (function () {
             };
         }
         catch (error) {
-            console.error(`[search_weather] 错误: ${error.message}`);
-            console.error(error.stack);
-            throw new Error(`获取天气信息失败: ${error.message}`);
+            console.error(`[search_weather] 错误: ${error.message} [daily_life.search_weather]`);
+            console.error(error.stack, '[daily_life.search_weather]');
+            throw new Error(`获取天气信息失败: ${error.message} [daily_life.search_weather]`);
         }
     }
     /**
@@ -332,8 +332,8 @@ const dailyLife = (function () {
             };
         }
         catch (error) {
-            console.error(`[set_reminder] 错误: ${error.message}`);
-            console.error(error.stack);
+            console.error(`[set_reminder] 错误: ${error.message} [daily_life.set_reminder]`);
+            console.error(error.stack, '[daily_life.set_reminder]');
             return {
                 success: false,
                 message: `创建提醒失败: ${error.message}`,
@@ -419,8 +419,8 @@ const dailyLife = (function () {
             };
         }
         catch (error) {
-            console.error(`[set_alarm] 错误: ${error.message}`);
-            console.error(error.stack);
+            console.error(`[set_alarm] 错误: ${error.message} [daily_life.set_alarm]`);
+            console.error(error.stack, '[daily_life.set_alarm]');
             return {
                 success: false,
                 message: `设置闹钟失败: ${error.message}`,
