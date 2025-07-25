@@ -2,7 +2,8 @@
     "scripts": {
         "build": "webpack",
         "java2ts": "java2ts config.json",
-        "builder": "node ./build/build.js"
+        "builder": "node ./build/build.js",
+        "lint": "eslint ."
     },
     "dependencies": {
     },

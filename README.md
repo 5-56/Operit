@@ -174,3 +174,17 @@ Operit AI 提供丰富的插件生态，配合内置工具可实现从日常生�
 请访问 [Issue区](https://github.com/AAswordman/Operit/issues) 查看最新的已知问题列表。
 
 如果你发现了其他 bug，欢迎提交 issue 告诉我们！我们会尽快修复。
+
+## Android SDK 配置
+
+如需构建Android项目，请在项目根目录下新建 `local.properties` 文件，内容如下（请替换为实际SDK路径）：
+
+```
+sdk.dir=/your/android/sdk/path
+```
+
+或设置环境变量：
+
+```
+export ANDROID_HOME=/your/android/sdk/path
+```

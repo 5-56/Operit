@@ -39,6 +39,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // TODO: 发布正式包时请使用正式签名配置，不要用debug签名
             signingConfig = signingConfigs.getByName("debug")
         }
     }
