@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.ai.assistance.operit.core.agent.AgentTemplateManager
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ fun AgentScreen(
     
     var userInput by remember { mutableStateOf("") }
     var showPlanDetails by remember { mutableStateOf(false) }
+    var showTemplateScreen by remember { mutableStateOf(false) }
     
     val uiState by viewModel.uiState.collectAsState()
     
@@ -49,12 +51,22 @@ fun AgentScreen(
     Column(
         modifier = modifier.fillMaxSize()
     ) {
-        // 顶部工具栏
+                // 顶部工具栏
         TopAppBar(
             title = { 
                 Text("智能Agent助手") 
             },
             actions = {
+                // 模板按钮
+                IconButton(
+                    onClick = { showTemplateScreen = true }
+                ) {
+                    Icon(
+                        Icons.Default.LibraryBooks,
+                        contentDescription = "任务模板"
+                    )
+                }
+                
                 // 显示当前计划按钮
                 if (uiState.currentPlan != null) {
                     IconButton(
@@ -174,6 +186,12 @@ fun AgentScreen(
                     // 快捷操作按钮
                     Row {
                         TextButton(
+                            onClick = { showTemplateScreen = true }
+                        ) {
+                            Text("模板")
+                        }
+                        
+                        TextButton(
                             onClick = { 
                                 userInput = "帮我整理桌面文件，将相同类型的文件放到对应文件夹中"
                             }
@@ -218,6 +236,19 @@ fun AgentScreen(
         PlanDetailsDialog(
             plan = uiState.currentPlan,
             onDismiss = { showPlanDetails = false }
+        )
+    }
+    
+    // 模板选择界面
+    if (showTemplateScreen) {
+        AgentTemplateScreen(
+            onTemplateSelected = { template, parameters ->
+                val templateManager = AgentTemplateManager.getInstance(context)
+                val prompt = templateManager.applyTemplate(template, parameters)
+                userInput = prompt
+                showTemplateScreen = false
+            },
+            onBackPressed = { showTemplateScreen = false }
         )
     }
 }

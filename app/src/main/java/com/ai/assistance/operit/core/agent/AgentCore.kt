@@ -110,6 +110,8 @@ class AgentCore(private val context: Context) {
     private val jsEngine = JsEngine(context)
     private val aiService = EnhancedAIService.getInstance(context)
     private val apiPreferences = ApiPreferences(context)
+    private val templateManager = AgentTemplateManager.getInstance(context)
+    private val performanceMonitor = AgentPerformanceMonitor.getInstance(context)
     
     // 当前执行的计划
     private var currentPlan: AgentPlan? = null
@@ -137,6 +139,7 @@ class AgentCore(private val context: Context) {
             
             // 3. 执行计划
             plan.status = AgentPlanStatus.EXECUTING
+            performanceMonitor.startExecution(plan.id)
             emit(AgentResult(true, "开始执行计划...", null, plan))
             
             for (step in plan.steps) {
@@ -150,6 +153,7 @@ class AgentCore(private val context: Context) {
                     
                     if (!optimizedResult.success) {
                         plan.status = AgentPlanStatus.FAILED
+                        performanceMonitor.completeExecution(plan.id, plan, false, stepResult.message)
                         emit(AgentResult(false, "计划执行失败", null, plan, step))
                         return@flow
                     }
@@ -159,10 +163,14 @@ class AgentCore(private val context: Context) {
             // 4. 完成执行
             plan.status = AgentPlanStatus.COMPLETED
             executionHistory.add(plan)
+            performanceMonitor.completeExecution(plan.id, plan, true)
             emit(AgentResult(true, "计划执行完成！", null, plan))
             
         } catch (e: Exception) {
             Log.e(TAG, "处理用户需求时出错", e)
+            currentPlan?.let { plan ->
+                performanceMonitor.completeExecution(plan.id, plan, false, e.message)
+            }
             emit(AgentResult(false, "处理请求时出错: ${e.message}"))
         }
     }
@@ -301,6 +309,7 @@ class AgentCore(private val context: Context) {
         try {
             Log.d(TAG, "执行步骤: ${step.description}")
             step.status = AgentStepStatus.RUNNING
+            performanceMonitor.recordStepExecution(plan.id, step.type)
             
             when (step.type) {
                 AgentStepType.ANALYSIS -> {
