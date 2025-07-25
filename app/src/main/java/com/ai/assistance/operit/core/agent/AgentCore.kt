@@ -112,6 +112,8 @@ class AgentCore(private val context: Context) {
     private val apiPreferences = ApiPreferences(context)
     private val templateManager = AgentTemplateManager.getInstance(context)
     private val performanceMonitor = AgentPerformanceMonitor.getInstance(context)
+    private val memoryManager = AgentMemoryManager.getInstance(context)
+    private val multiAgentSystem = MultiAgentSystem.getInstance(context)
     
     // 当前执行的计划
     private var currentPlan: AgentPlan? = null
@@ -125,6 +127,19 @@ class AgentCore(private val context: Context) {
     suspend fun processUserRequest(userRequest: String): Flow<AgentResult> = flow {
         try {
             Log.d(TAG, "开始处理用户需求: $userRequest")
+            
+            // 开始新的会话并记录上下文
+            val sessionId = memoryManager.startNewSession()
+            memoryManager.recordContext("user_request", userRequest)
+            memoryManager.recordContext("start_time", System.currentTimeMillis().toString())
+            
+            // 获取相关记忆和建议
+            val relevantMemories = memoryManager.getRelevantMemories(userRequest)
+            val taskSuggestions = memoryManager.generateTaskSuggestions(userRequest)
+            
+            if (taskSuggestions.isNotEmpty()) {
+                emit(AgentResult(true, "基于历史经验，我有一些建议：${taskSuggestions.take(3).joinToString("; ")}", null))
+            }
             
             // 1. 分析用户需求
             emit(AgentResult(true, "正在分析用户需求...", null))
@@ -164,12 +179,29 @@ class AgentCore(private val context: Context) {
             plan.status = AgentPlanStatus.COMPLETED
             executionHistory.add(plan)
             performanceMonitor.completeExecution(plan.id, plan, true)
+            
+            // 记录成功经验和用户偏好
+            val taskCategory = detectTaskCategory(userRequest)
+            if (taskCategory != null) {
+                memoryManager.recordTaskExperience(taskCategory, true, System.currentTimeMillis() - (memoryManager.getContext("start_time")?.toLongOrNull() ?: 0L))
+            }
+            
+            // 保存会话记忆
+            val taskHistory = listOf(userRequest)
+            memoryManager.saveSessionMemory(taskHistory, userRequest)
+            
             emit(AgentResult(true, "计划执行完成！", null, plan))
             
         } catch (e: Exception) {
             Log.e(TAG, "处理用户需求时出错", e)
             currentPlan?.let { plan ->
                 performanceMonitor.completeExecution(plan.id, plan, false, e.message)
+                
+                // 记录失败经验
+                val taskCategory = detectTaskCategory(userRequest)
+                if (taskCategory != null) {
+                    memoryManager.recordTaskExperience(taskCategory, false, 0L, "执行失败: ${e.message}")
+                }
             }
             emit(AgentResult(false, "处理请求时出错: ${e.message}"))
         }
@@ -519,5 +551,21 @@ class AgentCore(private val context: Context) {
     fun cancelCurrentPlan() {
         currentPlan?.status = AgentPlanStatus.FAILED
         currentPlan = null
+    }
+    
+    /**
+     * 检测任务类别
+     */
+    private fun detectTaskCategory(description: String): String? {
+        val lowerDesc = description.lowercase()
+        return when {
+            lowerDesc.contains("文件") || lowerDesc.contains("整理") || lowerDesc.contains("清理") -> "文件管理"
+            lowerDesc.contains("系统") || lowerDesc.contains("监控") || lowerDesc.contains("性能") -> "系统监控"
+            lowerDesc.contains("网络") || lowerDesc.contains("下载") || lowerDesc.contains("api") -> "网络操作"
+            lowerDesc.contains("数据") || lowerDesc.contains("分析") || lowerDesc.contains("处理") -> "数据处理"
+            lowerDesc.contains("应用") || lowerDesc.contains("安装") || lowerDesc.contains("apk") -> "应用管理"
+            lowerDesc.contains("代码") || lowerDesc.contains("开发") || lowerDesc.contains("调试") -> "开发辅助"
+            else -> null
+        }
     }
 }

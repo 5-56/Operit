@@ -3,6 +3,7 @@ package com.ai.assistance.operit.core.tools
 import android.content.Context
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
 import com.ai.assistance.operit.core.tools.defaultTool.agent.AgentTools
+import com.ai.assistance.operit.core.tools.defaultTool.agent.AdvancedAgentTools
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.ui.permissions.ToolCategory
@@ -853,6 +854,7 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
 
     // ==================== Agent工具 ====================
     val agentTools = AgentTools(context)
+    val advancedAgentTools = AdvancedAgentTools(context)
 
     // 执行Agent任务
     handler.registerTool(
@@ -927,5 +929,78 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 "智能脚本执行: $task"
             },
             executor = agentTools.SmartScriptExecution()
+    )
+
+    // ==================== 高级Agent工具 ====================
+
+    // 多Agent协作任务执行
+    handler.registerTool(
+            name = "execute_collaborative_task",
+            category = ToolCategory.AI_AGENT,
+            dangerCheck = { tool ->
+                val description = tool.parameters.find { it.name == "description" }?.value ?: ""
+                description.contains("删除") || description.contains("修改") || description.contains("系统")
+            },
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: "协作任务"
+                "执行多Agent协作任务: $title"
+            },
+            executor = advancedAgentTools.ExecuteCollaborativeTask()
+    )
+
+    // 智能任务分解
+    handler.registerTool(
+            name = "decompose_complex_task",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val taskDescription = tool.parameters.find { it.name == "task_description" }?.value ?: ""
+                "分解复杂任务: ${taskDescription.take(50)}..."
+            },
+            executor = advancedAgentTools.DecomposeComplexTask()
+    )
+
+    // Agent系统状态查询
+    handler.registerTool(
+            name = "get_agent_system_status",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { _ -> "获取Agent系统状态" },
+            executor = advancedAgentTools.GetAgentSystemStatus()
+    )
+
+    // 记忆管理
+    handler.registerTool(
+            name = "manage_agent_memory",
+            category = ToolCategory.AI_AGENT,
+            dangerCheck = { tool ->
+                val action = tool.parameters.find { it.name == "action" }?.value ?: ""
+                action.lowercase() in listOf("reset", "cleanup")
+            },
+            descriptionGenerator = { tool ->
+                val action = tool.parameters.find { it.name == "action" }?.value ?: "管理"
+                "Agent记忆管理: $action"
+            },
+            executor = advancedAgentTools.ManageAgentMemory()
+    )
+
+    // 性能监控
+    handler.registerTool(
+            name = "get_performance_metrics",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val metricsType = tool.parameters.find { it.name == "metrics_type" }?.value ?: "概览"
+                "获取性能指标: $metricsType"
+            },
+            executor = advancedAgentTools.GetPerformanceMetrics()
+    )
+
+    // 智能建议生成
+    handler.registerTool(
+            name = "generate_intelligent_suggestions",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val currentTask = tool.parameters.find { it.name == "current_task" }?.value ?: ""
+                "生成智能建议: ${currentTask.take(30)}..."
+            },
+            executor = advancedAgentTools.GenerateIntelligentSuggestions()
     )
 }
