@@ -506,22 +506,99 @@ object AgentScriptGenerator {
     
     // === 错误分析 ===
     
+    // 详细错误分析
     private fun analyzeError(feedback: String): ErrorAnalysis {
-        for ((pattern, suggestion) in errorPatterns) {
-            if (feedback.contains(pattern, ignoreCase = true)) {
-                return ErrorAnalysis(
-                    errorType = pattern,
-                    suggestion = suggestion,
-                    riskLevel = "中等"
+        val analysis = ErrorAnalysis()
+        
+        // 分析错误类型
+        when {
+            feedback.contains("ReferenceError", ignoreCase = true) -> {
+                analysis.errorType = "ReferenceError"
+                analysis.description = "变量或函数未定义"
+                analysis.suggestions = listOf(
+                    "检查变量是否正确声明",
+                    "确认函数名拼写正确",
+                    "检查作用域问题",
+                    "添加必要的变量声明"
+                )
+            }
+            
+            feedback.contains("SyntaxError", ignoreCase = true) -> {
+                analysis.errorType = "SyntaxError"
+                analysis.description = "语法错误"
+                analysis.suggestions = listOf(
+                    "检查括号、引号是否匹配",
+                    "确认语句结尾分号",
+                    "检查变量名是否符合规范",
+                    "验证函数声明语法"
+                )
+            }
+            
+            feedback.contains("TypeError", ignoreCase = true) -> {
+                analysis.errorType = "TypeError"
+                analysis.description = "类型错误"
+                analysis.suggestions = listOf(
+                    "检查变量类型是否正确",
+                    "确认方法调用对象存在",
+                    "验证参数类型匹配",
+                    "添加类型检查"
+                )
+            }
+            
+            feedback.contains("timeout", ignoreCase = true) || feedback.contains("超时", ignoreCase = true) -> {
+                analysis.errorType = "TimeoutError"
+                analysis.description = "执行超时"
+                analysis.suggestions = listOf(
+                    "优化算法效率",
+                    "减少循环次数",
+                    "添加异步处理",
+                    "分解复杂任务"
+                )
+            }
+            
+            feedback.contains("网络", ignoreCase = true) || feedback.contains("network", ignoreCase = true) -> {
+                analysis.errorType = "NetworkError"
+                analysis.description = "网络连接问题"
+                analysis.suggestions = listOf(
+                    "检查网络连接",
+                    "添加重试机制",
+                    "设置合理超时时间",
+                    "处理网络异常"
+                )
+            }
+            
+            feedback.contains("权限", ignoreCase = true) || feedback.contains("permission", ignoreCase = true) -> {
+                analysis.errorType = "PermissionError"
+                analysis.description = "权限不足"
+                analysis.suggestions = listOf(
+                    "检查文件访问权限",
+                    "确认API调用权限",
+                    "添加权限检查",
+                    "使用适当的访问方式"
+                )
+            }
+            
+            else -> {
+                analysis.errorType = "UnknownError"
+                analysis.description = "未知错误"
+                analysis.suggestions = listOf(
+                    "添加更详细的日志",
+                    "使用try-catch捕获异常",
+                    "检查输入参数",
+                    "验证运行环境"
                 )
             }
         }
         
-        return ErrorAnalysis(
-            errorType = "未知错误",
-            suggestion = "建议检查代码逻辑和输入参数",
-            riskLevel = "低"
-        )
+        // 分析严重程度
+        analysis.severity = when {
+            feedback.contains("fatal", ignoreCase = true) || feedback.contains("致命", ignoreCase = true) -> "HIGH"
+            feedback.contains("error", ignoreCase = true) || feedback.contains("错误", ignoreCase = true) -> "MEDIUM"
+            feedback.contains("warning", ignoreCase = true) || feedback.contains("警告", ignoreCase = true) -> "LOW"
+            else -> "MEDIUM"
+        }
+        
+        return analysis
     }
     
     // === 数据类 ===
@@ -535,10 +612,21 @@ object AgentScriptGenerator {
     )
     
     data class ErrorAnalysis(
-        val errorType: String,
-        val suggestion: String,
+        var errorType: String = "",
+        var description: String = "",
+        var suggestions: List<String> = emptyList(),
+        var severity: String = "MEDIUM"
+    ) {
+        val suggestion: String
+            get() = suggestions.joinToString("\n- ")
         val riskLevel: String
-    )
+            get() = when (severity) {
+                "HIGH" -> "高"
+                "MEDIUM" -> "中"
+                "LOW" -> "低"
+                else -> "未知"
+            }
+    }
     
     data class ScriptExecutionResult(
         val success: Boolean,

@@ -8,6 +8,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.core.agent.AgentConfig
 import com.ai.assistance.operit.core.agent.OptimizationStrategy
 import com.ai.assistance.operit.core.agent.LLMServiceFactory
+import com.ai.assistance.operit.util.SecurityHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +34,8 @@ fun AgentConfigDialog(
     var showProviderDropdown by remember { mutableStateOf(false) }
     var showModelDropdown by remember { mutableStateOf(false) }
     var showStrategyDropdown by remember { mutableStateOf(false) }
+    var showTestConnectionDialog by remember { mutableStateOf(false) }
+    var validationErrors by remember { mutableStateOf<List<String>>(emptyList()) }
     
     val supportedProviders = remember { LLMServiceFactory.getSupportedProviders() }
     val currentProvider = supportedProviders.find { it.id == config.llmProvider }
@@ -522,6 +528,97 @@ fun AgentConfigDialog(
                         Text("调试", style = MaterialTheme.typography.bodySmall)
                     }
                 }
+
+                // 验证按钮
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            // 实现配置验证逻辑
+                            val validationResult = validateConfiguration(config)
+                            validationErrors = if (validationResult.isValid) {
+                                emptyList()
+                            } else {
+                                validationResult.errors
+                            }
+                            
+                            if (validationResult.isValid) {
+                                // 可选：测试连接
+                                showTestConnectionDialog = true
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("验证配置")
+                    }
+                    
+                    OutlinedButton(
+                        onClick = {
+                            // 重置为默认配置
+                            config = AgentConfig()
+                            validationErrors = emptyList()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("重置")
+                    }
+                }
+                
+                // 显示验证错误信息
+                if (validationErrors.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "配置验证失败",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            validationErrors.forEach { error ->
+                                Text(
+                                    text = "• $error",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -545,3 +642,107 @@ fun AgentConfigDialog(
         }
     )
 }
+
+    // 验证配置的数据类
+    private data class ValidationResult(
+        val isValid: Boolean,
+        val errors: List<String> = emptyList()
+    )
+    
+    // 配置验证函数
+    private fun validateConfiguration(config: AgentConfig): ValidationResult {
+        val errors = mutableListOf<String>()
+        
+        // 验证LLM提供商和API密钥
+        if (config.llmProvider.isBlank()) {
+            errors.add("请选择LLM提供商")
+        }
+        
+        if (config.llmApiKey.isBlank()) {
+            errors.add("请输入API密钥")
+        } else {
+            // 使用安全助手验证API密钥格式
+            val apiKeyValidation = SecurityHelper.ApiKeyManager.validateApiKey(
+                config.llmProvider, 
+                config.llmApiKey
+            )
+            if (!apiKeyValidation.isValid) {
+                errors.add("API密钥格式错误: ${apiKeyValidation.message}")
+            }
+        }
+        
+        // 验证端点URL
+        if (config.llmEndpoint.isNotBlank()) {
+            val urlValidation = SecurityHelper.InputValidator.validateUrl(config.llmEndpoint)
+            if (!urlValidation.isValid) {
+                errors.add("端点URL格式错误: ${urlValidation.message}")
+            }
+        }
+        
+        // 验证模型名称
+        if (config.llmModel.isNotBlank()) {
+            val modelValidation = SecurityHelper.InputValidator.validateModelName(config.llmModel)
+            if (!modelValidation.isValid) {
+                errors.add("模型名称格式错误: ${modelValidation.message}")
+            }
+        }
+        
+        // 验证数值范围
+        if (config.maxIterations < 1 || config.maxIterations > 10) {
+            errors.add("最大迭代次数应在1-10之间")
+        }
+        
+        if (config.maxTokens < 100 || config.maxTokens > 32000) {
+            errors.add("最大Token数应在100-32000之间")
+        }
+        
+        if (config.temperature < 0.0f || config.temperature > 2.0f) {
+            errors.add("温度值应在0.0-2.0之间")
+        }
+        
+        if (config.executionTimeout < 1000L || config.executionTimeout > 300000L) {
+            errors.add("执行超时时间应在1-300秒之间")
+        }
+        
+        if (config.maxRetryCount < 0 || config.maxRetryCount > 5) {
+            errors.add("重试次数应在0-5之间")
+        }
+        
+        if (config.successThreshold < 0.0f || config.successThreshold > 1.0f) {
+            errors.add("成功阈值应在0.0-1.0之间")
+        }
+        
+        if (config.contextWindowSize < 1000 || config.contextWindowSize > 128000) {
+            errors.add("上下文窗口大小应在1000-128000之间")
+        }
+        
+        if (config.memorySize < 10 || config.memorySize > 1000) {
+            errors.add("记忆大小应在10-1000之间")
+        }
+        
+        // 验证自定义提示词模板
+        if (config.customPromptTemplate.isNotBlank()) {
+            if (SecurityHelper.InputValidator.containsMaliciousScript(config.customPromptTemplate)) {
+                errors.add("自定义提示词模板包含可疑内容")
+            }
+            if (config.customPromptTemplate.length > 5000) {
+                errors.add("自定义提示词模板过长（超过5000字符）")
+            }
+        }
+        
+        // 验证自定义参数
+        config.customParameters.forEach { (key, value) ->
+            if (key.isBlank()) {
+                errors.add("自定义参数的键不能为空")
+            }
+            if (SecurityHelper.InputValidator.containsMaliciousScript(key) ||
+                SecurityHelper.InputValidator.containsMaliciousScript(value)) {
+                errors.add("自定义参数包含可疑内容")
+            }
+        }
+        
+        return ValidationResult(
+            isValid = errors.isEmpty(),
+            errors = errors
+        )
+    }
