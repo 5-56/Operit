@@ -2,6 +2,8 @@ package com.ai.assistance.operit.core.tools
 
 import android.content.Context
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
+import com.ai.assistance.operit.core.tools.defaultTool.agent.AgentTools
+import com.ai.assistance.operit.core.tools.defaultTool.agent.AdvancedAgentTools
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.ui.permissions.ToolCategory
@@ -848,5 +850,157 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             category = ToolCategory.FILE_READ,
             descriptionGenerator = { _ -> "获取支持的文件转换格式" },
             executor = { tool -> fileConverterTool.invoke(tool) }
+    )
+
+    // ==================== Agent工具 ====================
+    val agentTools = AgentTools(context)
+    val advancedAgentTools = AdvancedAgentTools(context)
+
+    // 执行Agent任务
+    handler.registerTool(
+            name = "execute_agent_task",
+            category = ToolCategory.AI_AGENT,
+            dangerCheck = { tool ->
+                // Agent任务可能执行复杂操作，需要用户确认
+                val request = tool.parameters.find { it.name == "request" }?.value ?: ""
+                request.contains("删除") || request.contains("修改") || request.contains("系统")
+            },
+            descriptionGenerator = { tool ->
+                val request = tool.parameters.find { it.name == "request" }?.value ?: ""
+                "执行智能Agent任务: $request"
+            },
+            executor = agentTools.ExecuteAgentTask()
+    )
+
+    // 获取当前Agent计划
+    handler.registerTool(
+            name = "get_current_agent_plan",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { _ -> "获取当前Agent执行计划" },
+            executor = agentTools.GetCurrentPlan()
+    )
+
+    // 获取Agent执行历史
+    handler.registerTool(
+            name = "get_agent_history",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val limit = tool.parameters.find { it.name == "limit" }?.value ?: "10"
+                "获取Agent执行历史 (最近${limit}条)"
+            },
+            executor = agentTools.GetExecutionHistory()
+    )
+
+    // 暂停当前Agent计划
+    handler.registerTool(
+            name = "pause_agent_plan",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { _ -> "暂停当前Agent计划" },
+            executor = agentTools.PauseCurrentPlan()
+    )
+
+    // 恢复当前Agent计划
+    handler.registerTool(
+            name = "resume_agent_plan",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { _ -> "恢复当前Agent计划" },
+            executor = agentTools.ResumeCurrentPlan()
+    )
+
+    // 取消当前Agent计划
+    handler.registerTool(
+            name = "cancel_agent_plan",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { _ -> "取消当前Agent计划" },
+            executor = agentTools.CancelCurrentPlan()
+    )
+
+    // 智能脚本生成和执行
+    handler.registerTool(
+            name = "smart_script_execution",
+            category = ToolCategory.AI_AGENT,
+            dangerCheck = { tool ->
+                // 脚本执行可能有风险，需要检查任务内容
+                val task = tool.parameters.find { it.name == "task" }?.value ?: ""
+                task.contains("删除") || task.contains("修改") || task.contains("系统") || task.contains("网络")
+            },
+            descriptionGenerator = { tool ->
+                val task = tool.parameters.find { it.name == "task" }?.value ?: ""
+                "智能脚本执行: $task"
+            },
+            executor = agentTools.SmartScriptExecution()
+    )
+
+    // ==================== 高级Agent工具 ====================
+
+    // 多Agent协作任务执行
+    handler.registerTool(
+            name = "execute_collaborative_task",
+            category = ToolCategory.AI_AGENT,
+            dangerCheck = { tool ->
+                val description = tool.parameters.find { it.name == "description" }?.value ?: ""
+                description.contains("删除") || description.contains("修改") || description.contains("系统")
+            },
+            descriptionGenerator = { tool ->
+                val title = tool.parameters.find { it.name == "title" }?.value ?: "协作任务"
+                "执行多Agent协作任务: $title"
+            },
+            executor = advancedAgentTools.ExecuteCollaborativeTask()
+    )
+
+    // 智能任务分解
+    handler.registerTool(
+            name = "decompose_complex_task",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val taskDescription = tool.parameters.find { it.name == "task_description" }?.value ?: ""
+                "分解复杂任务: ${taskDescription.take(50)}..."
+            },
+            executor = advancedAgentTools.DecomposeComplexTask()
+    )
+
+    // Agent系统状态查询
+    handler.registerTool(
+            name = "get_agent_system_status",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { _ -> "获取Agent系统状态" },
+            executor = advancedAgentTools.GetAgentSystemStatus()
+    )
+
+    // 记忆管理
+    handler.registerTool(
+            name = "manage_agent_memory",
+            category = ToolCategory.AI_AGENT,
+            dangerCheck = { tool ->
+                val action = tool.parameters.find { it.name == "action" }?.value ?: ""
+                action.lowercase() in listOf("reset", "cleanup")
+            },
+            descriptionGenerator = { tool ->
+                val action = tool.parameters.find { it.name == "action" }?.value ?: "管理"
+                "Agent记忆管理: $action"
+            },
+            executor = advancedAgentTools.ManageAgentMemory()
+    )
+
+    // 性能监控
+    handler.registerTool(
+            name = "get_performance_metrics",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val metricsType = tool.parameters.find { it.name == "metrics_type" }?.value ?: "概览"
+                "获取性能指标: $metricsType"
+            },
+            executor = advancedAgentTools.GetPerformanceMetrics()
+    )
+
+    // 智能建议生成
+    handler.registerTool(
+            name = "generate_intelligent_suggestions",
+            category = ToolCategory.AI_AGENT,
+            descriptionGenerator = { tool ->
+                val currentTask = tool.parameters.find { it.name == "current_task" }?.value ?: ""
+                "生成智能建议: ${currentTask.take(30)}..."
+            },
+            executor = advancedAgentTools.GenerateIntelligentSuggestions()
     )
 }

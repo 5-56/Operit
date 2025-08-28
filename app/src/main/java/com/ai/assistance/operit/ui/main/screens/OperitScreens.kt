@@ -107,6 +107,22 @@ sealed class Screen(
         }
     }
 
+    data object Agent : Screen(navItem = NavItem.Agent) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                updateNavItem: NavItemChangeHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            com.ai.assistance.operit.ui.features.agent.screens.AgentScreen()
+        }
+    }
+
     data object MemoryBase : Screen(navItem = NavItem.MemoryBase, titleRes = "记忆库") {
         @Composable
         override fun Content(
@@ -763,6 +779,7 @@ object OperitRouter {
     fun getScreenForNavItem(navItem: NavItem): Screen {
         return when (navItem) {
             NavItem.AiChat -> Screen.AiChat
+            NavItem.Agent -> Screen.Agent
             NavItem.MemoryBase -> Screen.MemoryBase
             NavItem.Packages -> Screen.Packages
             NavItem.Toolbox -> Screen.Toolbox
