@@ -36,14 +36,14 @@ class InvitationRepository(private val context: Context) {
         }
 
     /**
-     * A flow that emits `true` if the workspace feature is unlocked (invitation count >= 1).
+     * Workspace is always unlocked (remove invitation gating).
      */
-    val isWorkspaceUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { it >= 1 }
+    val isWorkspaceUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { true }
 
     /**
-     * A flow that emits `true` if the floating window feature is unlocked (invitation count >= 2).
+     * Floating window is always unlocked (remove invitation gating).
      */
-    val isFloatingWindowUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { it >= 2 }
+    val isFloatingWindowUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { true }
 
     /**
      * A flow that emits `true` if the device has already been successfully invited.
