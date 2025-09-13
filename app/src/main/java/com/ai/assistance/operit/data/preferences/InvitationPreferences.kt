@@ -36,14 +36,14 @@ class InvitationRepository(private val context: Context) {
         }
 
     /**
-     * A flow that emits `true` if the workspace feature is unlocked (invitation count >= 1).
+     * A flow that emits `true` if the workspace feature is unlocked (always unlocked now).
      */
-    val isWorkspaceUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { it >= 1 }
+    val isWorkspaceUnlockedFlow: Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true)
 
     /**
-     * A flow that emits `true` if the floating window feature is unlocked (invitation count >= 2).
+     * A flow that emits `true` if the floating window feature is unlocked (always unlocked now).
      */
-    val isFloatingWindowUnlockedFlow: Flow<Boolean> = invitationCountFlow.map { it >= 2 }
+    val isFloatingWindowUnlockedFlow: Flow<Boolean> = kotlinx.coroutines.flow.flowOf(true)
 
     /**
      * A flow that emits `true` if the device has already been successfully invited.

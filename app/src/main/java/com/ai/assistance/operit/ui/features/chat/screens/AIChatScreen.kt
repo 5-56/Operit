@@ -745,29 +745,6 @@ fun AIChatScreen(
         )
     }
 
-    // New Invitation Explanation Dialog
-    val showInvitationExplanation by actualViewModel.showInvitationExplanation.collectAsState()
-    if (showInvitationExplanation) {
-        InvitationExplanationDialog(
-            onDismiss = { actualViewModel.dismissInvitationExplanation() },
-            onConfirm = { actualViewModel.onInvitationExplanationConfirmed() }
-        )
-    }
-
-    // New Invitation Panel Dialog
-    val showInvitationPanel by actualViewModel.showInvitationPanel.collectAsState()
-    if (showInvitationPanel) {
-        val invitationCount by actualViewModel.invitationCount.collectAsState(initial = 0)
-        val invitationMessage by actualViewModel.generatedInvitationMessage.collectAsState()
-
-        InvitationPanelDialog(
-            invitationCount = invitationCount,
-            invitationMessage = invitationMessage,
-            onDismiss = { actualViewModel.dismissInvitationPanel() },
-            onShare = { message -> actualViewModel.shareInvitationMessage(message) },
-            onVerifyCode = { code -> actualViewModel.verifyAndHandleConfirmationCode(code) }
-        )
-    }
 
     // Check for overlay permission on resume
     LaunchedEffect(Unit) {

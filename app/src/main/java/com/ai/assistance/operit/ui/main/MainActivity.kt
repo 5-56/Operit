@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.LocaleList
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -25,8 +24,6 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.core.invitation.InvitationManager
-import com.ai.assistance.operit.core.invitation.ProcessInvitationResult
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.migration.ChatHistoryMigrationManager
 import com.ai.assistance.operit.data.preferences.AgreementPreferences
@@ -46,8 +43,6 @@ import com.ai.assistance.operit.util.LocaleUtils
 import java.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import android.content.ClipboardManager
-import android.content.ClipData
 
 class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
@@ -56,13 +51,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var toolHandler: AIToolHandler
     private lateinit var preferencesManager: UserPreferencesManager
     private lateinit var agreementPreferences: AgreementPreferences
-    private lateinit var invitationManager: InvitationManager // Add InvitationManager instance
     private var updateCheckPerformed = false
     private lateinit var anrMonitor: AnrMonitor
 
     // ======== 对话框状态 ========
-    private var showConfirmationDialogState by mutableStateOf<String?>(null)
-    private var showReminderDialogState by mutableStateOf<String?>(null)
 
     // ======== 导航状态 ========
     private var showPreferencesGuide = false
@@ -262,46 +254,8 @@ class MainActivity : ComponentActivity() {
 
         // 清理临时文件目录
         cleanTemporaryFiles()
-        // Check clipboard for invitation code when the app resumes
-        checkClipboardForInvitation()
     }
 
-    private fun checkClipboardForInvitation() {
-        lifecycleScope.launch {
-            // 等待一小段时间，确保应用完全获得焦点，避免因Android 10+剪贴板限制导致读取失败
-            delay(500)
-
-            Log.d(TAG, "检查剪贴板中的邀请码...")
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val clipData = clipboard?.primaryClip
-            if (clipData != null && clipData.itemCount > 0) {
-                val text = clipData.getItemAt(0).coerceToText(this@MainActivity).toString()
-                if (text.isNotBlank()) {
-                    Log.d(TAG, "剪贴板内容: '$text'")
-                    when (val result = invitationManager.processInvitationFromText(text)) {
-                        is ProcessInvitationResult.Success -> {
-                            Log.d(TAG, "邀请码处理成功: ${result.confirmationCode}")
-                            // Clear clipboard to prevent re-triggering
-                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                            showConfirmationDialogState = result.confirmationCode
-                        }
-                        is ProcessInvitationResult.Reminder -> {
-                            Log.d(TAG, "邀请码提醒: ${result.confirmationCode}")
-                            // Clear clipboard to prevent re-triggering
-                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                            showReminderDialogState = result.confirmationCode
-                        }
-                        is ProcessInvitationResult.Failure -> Log.d(TAG, "Clipboard check failed: ${result.reason}")
-                        is ProcessInvitationResult.AlreadyInvited -> Log.d(TAG, "Device already invited by someone else.")
-                    }
-                } else {
-                    Log.d(TAG, "剪贴板内容为空白。")
-                }
-            } else {
-                Log.d(TAG, "剪贴板为空或无项目。")
-            }
-        }
-    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -330,8 +284,6 @@ class MainActivity : ComponentActivity() {
         toolHandler = AIToolHandler.getInstance(this)
         toolHandler.registerDefaultTools()
 
-        // Initialize InvitationManager
-        invitationManager = InvitationManager(this)
 
         anrMonitor = AnrMonitor(this, lifecycleScope)
 
@@ -483,24 +435,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // 显示邀请结果对话框
-                    showConfirmationDialogState?.let { code ->
-                        InvitationResultDialog(
-                            title = "邀请已接受！",
-                            message = "请将以下返回码发送给你的朋友，以完成最终邀请步骤：\n\n$code",
-                            confirmationCode = code,
-                            onDismiss = { showConfirmationDialogState = null }
-                        )
-                    }
-
-                    showReminderDialogState?.let { code ->
-                        InvitationResultDialog(
-                            title = "是不是忘记了什么？",
-                            message = "你好像又被同一个人邀请了呢，是不是忘记把下面的返回码发给他了？拿稳！\n\n$code",
-                            confirmationCode = code,
-                            onDismiss = { showReminderDialogState = null }
-                        )
-                    }
                 }
             }
         }
@@ -637,35 +571,3 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-private fun InvitationResultDialog(
-    title: String,
-    message: String,
-    confirmationCode: String,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = title) },
-        text = { Text(text = message) },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("Confirmation Code", confirmationCode)
-                    clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, "返回码已复制！", Toast.LENGTH_SHORT).show()
-                    onDismiss()
-                }
-            ) {
-                Text("复制返回码")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("关闭")
-            }
-        }
-    )
-}
