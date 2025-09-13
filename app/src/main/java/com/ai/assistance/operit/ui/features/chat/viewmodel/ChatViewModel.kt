@@ -11,7 +11,6 @@ import androidx.compose.material3.Typography
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.api.chat.EnhancedAIService
-import com.ai.assistance.operit.core.invitation.InvitationManager
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.agent.AgentScriptGenerator
 import com.ai.assistance.operit.core.tools.javascript.JsEngine
@@ -51,65 +50,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         private const val TAG = "ChatViewModel"
     }
 
-    // Invitation and feature unlock management
+    // Feature unlock management - all features are now unlocked by default
     private val invitationRepository = InvitationRepository(context)
-    private val invitationManager = InvitationManager(context)
 
     val isWorkspaceUnlocked = invitationRepository.isWorkspaceUnlockedFlow
     val isFloatingWindowUnlocked = invitationRepository.isFloatingWindowUnlockedFlow
-    val invitationCount = invitationRepository.invitationCountFlow
-
-    private val _showInvitationExplanation = MutableStateFlow(false)
-    val showInvitationExplanation = _showInvitationExplanation.asStateFlow()
-
-    private val _showInvitationPanel = MutableStateFlow(false)
-    val showInvitationPanel = _showInvitationPanel.asStateFlow()
-
-    private val _generatedInvitationMessage = MutableStateFlow("")
-    val generatedInvitationMessage = _generatedInvitationMessage.asStateFlow()
-
-    fun showInvitationPanel() {
-        _generatedInvitationMessage.value = invitationManager.generateInvitationMessage()
-        _showInvitationPanel.value = true
-    }
-
-    fun dismissInvitationPanel() {
-        _showInvitationPanel.value = false
-    }
-
-    fun onInvitationExplanationConfirmed() {
-        // After user confirms, hide explanation and show the main panel
-        _showInvitationExplanation.value = false
-        showInvitationPanel()
-    }
-
-    fun dismissInvitationExplanation() {
-        _showInvitationExplanation.value = false
-    }
-
-    fun shareInvitationMessage(message: String) {
-        val sendIntent: Intent = Intent().apply {
-            action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, message)
-            type = "text/plain"
-        }
-        val shareIntent = Intent.createChooser(sendIntent, null)
-        shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(shareIntent)
-    }
-
-    fun verifyAndHandleConfirmationCode(code: String) {
-        viewModelScope.launch {
-            val success = invitationManager.verifyConfirmationCode(code)
-            if (success) {
-                showToast("邀请成功！感谢你的助力！")
-                // Dismiss the panel on success
-                dismissInvitationPanel()
-            } else {
-                showToast("返回码无效，请检查后重试。")
-            }
-        }
-    }
 
 
     // 服务收集器设置状态跟踪
@@ -739,21 +684,17 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 return@launch
             }
 
-            if (isFloatingWindowUnlocked.first()) {
-                when(mode) {
-                    FloatingMode.WINDOW -> launchFloatingWindowWithPermissionCheck(permissionLauncher) {
-                        launchFloatingModeIn(FloatingMode.WINDOW, colorScheme, typography)
-                    }
-                    FloatingMode.FULLSCREEN -> launchFullscreenVoiceModeWithPermissionCheck(permissionLauncher, colorScheme, typography)
-                    FloatingMode.BALL, 
-                    FloatingMode.VOICE_BALL,
-                    FloatingMode.DragonBones -> {
-                        // 这些模式暂时不处理，或者可以添加默认行为
-                        Log.d(TAG, "未实现的悬浮窗模式: $mode")
-                    }
+            when(mode) {
+                FloatingMode.WINDOW -> launchFloatingWindowWithPermissionCheck(permissionLauncher) {
+                    launchFloatingModeIn(FloatingMode.WINDOW, colorScheme, typography)
                 }
-            } else {
-                _showInvitationExplanation.value = true
+                FloatingMode.FULLSCREEN -> launchFullscreenVoiceModeWithPermissionCheck(permissionLauncher, colorScheme, typography)
+                FloatingMode.BALL, 
+                FloatingMode.VOICE_BALL,
+                FloatingMode.DragonBones -> {
+                    // 这些模式暂时不处理，或者可以添加默认行为
+                    Log.d(TAG, "未实现的悬浮窗模式: $mode")
+                }
             }
         }
     }
@@ -1270,11 +1211,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun onWorkspaceButtonClick() {
         viewModelScope.launch {
-            if (isWorkspaceUnlocked.first()) {
-                toggleWebView()
-            } else {
-                _showInvitationExplanation.value = true
-            }
+            toggleWebView()
         }
     }
 }
