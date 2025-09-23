@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Xihe theme colors -->
+    <color name="xihe_primary">#FF1976D2</color>
+    <color name="xihe_secondary">#FF42A5F5</color>
+    <color name="xihe_accent">#FFFF9800</color>
+    <color name="xihe_background">#FFF5F5F5</color>
+    <color name="xihe_surface">#FFFFFFFF</color>
+    <color name="xihe_error">#FFD32F2F</color>
+    
+    <!-- Dark theme colors -->
+    <color name="xihe_dark_primary">#FF1565C0</color>
+    <color name="xihe_dark_secondary">#FF2196F3</color>
+    <color name="xihe_dark_accent">#FFFFB74D</color>
+    <color name="xihe_dark_background">#FF121212</color>
+    <color name="xihe_dark_surface">#FF1E1E1E</color>
+    <color name="xihe_dark_error">#FFEF5350</color>
+</resources>
