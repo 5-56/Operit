@@ -55,6 +55,7 @@ import com.ai.assistance.operit.ui.features.toolbox.screens.speechtotext.SpeechT
 import com.ai.assistance.operit.ui.features.toolbox.screens.texttospeech.TextToSpeechToolScreen
 import com.ai.assistance.operit.ui.features.toolbox.screens.tooltester.ToolTesterScreen
 import com.ai.assistance.operit.ui.features.update.screens.UpdateScreen
+import com.ai.assistance.operit.ui.features.scripts.screens.ScriptsScreen
 
 // 路由配置类
 typealias ScreenNavigationHandler = (Screen) -> Unit
@@ -259,6 +260,22 @@ sealed class Screen(
                     onToolTesterSelected = { navigateTo(ToolTester) },
                     onAgreementSelected = { navigateTo(Agreement) }
             )
+        }
+    }
+
+    data object Scripts : Screen(navItem = NavItem.Scripts, titleRes = R.string.screen_title_scripts) {
+        @Composable
+        override fun Content(
+            navController: NavController,
+            navigateTo: ScreenNavigationHandler,
+            updateNavItem: NavItemChangeHandler,
+            onGoBack: () -> Unit,
+            hasBackgroundImage: Boolean,
+            onLoading: (Boolean) -> Unit,
+            onError: (String) -> Unit,
+            onGestureConsumed: (Boolean) -> Unit
+        ) {
+            ScriptsScreen(onBack = onGoBack)
         }
     }
 
@@ -984,6 +1001,7 @@ object OperitRouter {
             NavItem.MemoryBase -> Screen.MemoryBase
             NavItem.Packages -> Screen.Packages
             NavItem.Toolbox -> Screen.Toolbox
+            NavItem.Scripts -> Screen.Scripts
             NavItem.ShizukuCommands -> Screen.ShizukuCommands
             NavItem.Settings -> Screen.Settings
             NavItem.Help -> Screen.Help

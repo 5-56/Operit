@@ -9,16 +9,19 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ai.assistance.operit.data.dao.ChatDao
 import com.ai.assistance.operit.data.dao.MessageDao
+import com.ai.assistance.operit.data.dao.ScriptDao
 import com.ai.assistance.operit.data.model.ChatEntity
 import com.ai.assistance.operit.data.model.MessageEntity
+import com.ai.assistance.operit.data.model.script.ScriptEntity
+import com.ai.assistance.operit.data.model.script.ScriptConverters
 
-/** 应用数据库，包含问题记录表、聊天表和消息表 */
+/** 应用数据库，包含问题记录表、聊天表、消息表和脚本表 */
 @Database(
-        entities = [ProblemEntity::class, ChatEntity::class, MessageEntity::class],
-        version = 7,
+        entities = [ProblemEntity::class, ChatEntity::class, MessageEntity::class, ScriptEntity::class],
+        version = 8,
         exportSchema = false
 )
-@TypeConverters(StringListConverter::class)
+@TypeConverters(StringListConverter::class, ScriptConverters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     /** 获取问题记录DAO */
@@ -29,6 +32,9 @@ abstract class AppDatabase : RoomDatabase() {
 
     /** 获取消息DAO */
     abstract fun messageDao(): MessageDao
+
+    /** 获取脚本DAO */
+    abstract fun scriptDao(): ScriptDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -120,6 +126,31 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                 }
 
+        // 定义从版本7到8的迁移
+        private val MIGRATION_7_8 =
+                object : Migration(7, 8) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        db.execSQL(
+                                """
+                                CREATE TABLE IF NOT EXISTS `scripts` (
+                                    `id` TEXT NOT NULL,
+                                    `name` TEXT NOT NULL,
+                                    `description` TEXT NOT NULL,
+                                    `code` TEXT NOT NULL,
+                                    `language` TEXT NOT NULL,
+                                    `tags` TEXT NOT NULL,
+                                    `createdAt` INTEGER NOT NULL,
+                                    `updatedAt` INTEGER NOT NULL,
+                                    `isEnabled` INTEGER NOT NULL,
+                                    `category` TEXT NOT NULL,
+                                    `version` INTEGER NOT NULL,
+                                    PRIMARY KEY(`id`)
+                                )
+                                """.trimIndent()
+                        )
+                    }
+                }
+
         /** 获取数据库实例，单例模式 */
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE
@@ -130,7 +161,7 @@ abstract class AppDatabase : RoomDatabase() {
                                                 AppDatabase::class.java,
                                                 "app_database"
                                         )
-                                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7) // 添加新的迁移
+                                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8) // 添加新的迁移
                                         .build()
                         INSTANCE = instance
                         instance

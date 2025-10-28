@@ -11,6 +11,7 @@
     <string name="nav_packages">Gestión de paquetes</string>
     <string name="nav_terminal">Terminal</string>
     <string name="nav_toolbox">Caja de herramientas</string>
+    <string name="nav_scripts">Scripts</string>
     <string name="nav_item_agreement">Acuerdo de usuario</string>
     <string name="nav_help">Centro de ayuda</string>
     <string name="menu">Menú</string>
@@ -25,6 +26,7 @@
     <string name="mcp">MCP</string>
     <string name="token_config_title">Configuración de token DeepSeek</string>
     <string name="chat_history_settings">Gestión del historial de chat</string>
+    <string name="screen_title_scripts">Gestión de scripts</string>
 
     <!-- Attachment Panel -->
     <string name="screen_content">Contenido de pantalla</string>
