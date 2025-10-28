@@ -213,6 +213,7 @@ dependencies {
 
     // Kotlin Serialization
     implementation(libs.kotlinx.serialization)
+    implementation(libs.kaml)
     
     // UUID dependencies
     implementation(libs.uuid)
