@@ -1302,6 +1302,8 @@
     <string name="tool_terminal_auto_config_desc">自动安装配置Python、PIP等开发工具</string>
     <string name="tool_ui_debugger">UI调试工具</string>
     <string name="tool_ui_debugger_desc">调试和分析界面元素，支持元素查找和交互</string>
+    <string name="tool_flow_builder">可视化流程编辑器</string>
+    <string name="tool_flow_builder_desc">使用图形化界面创建和编辑自动化流程脚本</string>
     <string name="tool_ffmpeg_toolbox">FFmpeg工具箱</string>
     <string name="tool_ffmpeg_toolbox_desc">强大的音视频处理工具，支持转换、裁剪、合并等功能</string>
     <string name="tool_stream_markdown_demo">流式Markdown演示</string>
