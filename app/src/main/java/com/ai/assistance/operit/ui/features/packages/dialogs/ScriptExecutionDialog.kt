@@ -47,7 +47,11 @@ fun ScriptExecutionDialog(
     val scope = rememberCoroutineScope()
 
     var scriptText by remember(tool) { mutableStateOf(tool.script) }
-    var paramValues by remember(tool) { mutableStateOf(tool.parameters.associate { it.name to "" }) }
+    var paramValues by remember(tool) { 
+        mutableStateOf(tool.parameters.associate { 
+            it.name to (it.defaultValue ?: "") 
+        }) 
+    }
     var executing by remember { mutableStateOf(false) }
     var executionResults by remember { mutableStateOf<List<ToolResult>>(emptyList()) }
 
@@ -145,6 +149,13 @@ fun ScriptExecutionDialog(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         tool.parameters.forEach { param ->
+                            val labelText = buildString {
+                                append(param.prompt ?: param.name)
+                                if (param.required) {
+                                    append(" *")
+                                }
+                            }
+
                             OutlinedTextField(
                                 value = paramValues[param.name] ?: "",
                                 onValueChange = { value ->
@@ -153,11 +164,15 @@ fun ScriptExecutionDialog(
                                     }
                                 },
                                 label = {
-                                    Text("${param.name}${if (param.required) " *" else ""}")
+                                    Text(labelText)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
-                                placeholder = { Text(param.description) }
+                                placeholder = {
+                                    if (param.description.isNotEmpty()) {
+                                        Text(param.description)
+                                    }
+                                }
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                         }
