@@ -2,6 +2,7 @@ package com.ai.assistance.operit.core.tools
 
 import android.content.Context
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
 import com.ai.assistance.operit.core.tools.javascript.JsToolManager
@@ -44,7 +45,9 @@ data class PackageToolParameter(
     val name: String,
     val description: String,
     val type: String, // e.g., "string", "number", "boolean"
-    val required: Boolean = true
+    val required: Boolean = true,
+    val defaultValue: String? = null, // Default value if not provided
+    val prompt: String? = null // User-friendly prompt text (falls back to description if null)
 )
 
 /**
@@ -92,10 +95,14 @@ class PackageToolExecutor(
                 error = "Tool '$toolName' not found in package '${toolPackage.name}'"
             )
         
+        // Apply default values for missing parameters
+        val resolvedParameters = resolvePackageToolParameters(tool, packageTool)
+        val enrichedTool = if (resolvedParameters == tool.parameters) tool else tool.copy(parameters = resolvedParameters)
+        
         // Execute the script using runBlocking since we can't make this a suspending function
         // without changing the interface. We collect the last result for single-result compatibility.
         return runBlocking {
-            jsToolManager.executeScript(packageTool.script, tool).last()
+            jsToolManager.executeScript(packageTool.script, enrichedTool).last()
         }
     }
 
@@ -104,7 +111,10 @@ class PackageToolExecutor(
         val packageTool = toolPackage.tools.find { it.name.endsWith(tool.name.split(":").last()) }
             ?: error("Tool not found in package for streaming") // Should be validated before
 
-        return jsToolManager.executeScript(packageTool.script, tool)
+        val resolvedParameters = resolvePackageToolParameters(tool, packageTool)
+        val enrichedTool = if (resolvedParameters == tool.parameters) tool else tool.copy(parameters = resolvedParameters)
+
+        return jsToolManager.executeScript(packageTool.script, enrichedTool)
     }
     
     override fun validateParameters(tool: AITool): ToolValidationResult {
@@ -136,10 +146,16 @@ class PackageToolExecutor(
             )
         
         // Validate that all required parameters are present
+        val providedParams = tool.parameters.associateBy { it.name }
         val missingParams = packageTool.parameters
-            .filter { it.required }
-            .map { it.name }
-            .filter { paramName -> tool.parameters.none { it.name == paramName } }
+            .filter { it.required && it.defaultValue.isNullOrEmpty() }
+            .mapNotNull { definition ->
+                if (providedParams[definition.name]?.value.isNullOrEmpty()) {
+                    definition.name
+                } else {
+                    null
+                }
+            }
         
         if (missingParams.isNotEmpty()) {
             return ToolValidationResult(
@@ -177,5 +193,32 @@ class PackageToolExecutor(
         }
         
         return sb.toString()
+    }
+    
+    /**
+     * Resolves tool parameters by applying default values for missing or empty parameters.
+     * Returns a new list with resolved parameters.
+     */
+    private fun resolvePackageToolParameters(tool: AITool, packageTool: PackageTool): List<ToolParameter> {
+        if (packageTool.parameters.isEmpty()) {
+            return tool.parameters
+        }
+
+        val provided = tool.parameters.associateBy { it.name }
+        val resolvedParams = packageTool.parameters.mapNotNull { definition ->
+            val providedValue = provided[definition.name]?.value
+            when {
+                !providedValue.isNullOrEmpty() -> ToolParameter(definition.name, providedValue)
+                !definition.defaultValue.isNullOrEmpty() -> ToolParameter(definition.name, definition.defaultValue)
+                providedValue != null -> ToolParameter(definition.name, providedValue)
+                else -> null
+            }
+        }
+
+        val additionalParams = tool.parameters.filter { definition ->
+            packageTool.parameters.none { it.name == definition.name }
+        }
+
+        return resolvedParams + additionalParams
     }
 }
