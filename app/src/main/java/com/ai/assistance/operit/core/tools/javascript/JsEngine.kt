@@ -11,6 +11,8 @@ import com.ai.assistance.operit.core.tools.BinaryResultData
 import com.ai.assistance.operit.core.tools.BooleanResultData
 import com.ai.assistance.operit.core.tools.IntResultData
 import com.ai.assistance.operit.core.tools.StringResultData
+import com.ai.assistance.operit.core.tools.javascript.debug.ScriptDebugger
+import com.ai.assistance.operit.core.tools.javascript.debug.LogLevel
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import java.util.concurrent.CompletableFuture
@@ -1589,16 +1591,19 @@ class JsEngine(private val context: Context) {
         @JavascriptInterface
         fun logInfo(message: String) {
             Log.i(TAG, "JS: $message")
+            ScriptDebugger.getInstance(context).log(LogLevel.INFO, message, "JavaScript")
         }
 
         @JavascriptInterface
         fun logError(message: String) {
             Log.e(TAG, "JS ERROR: $message")
+            ScriptDebugger.getInstance(context).log(LogLevel.ERROR, message, "JavaScript")
         }
 
         @JavascriptInterface
         fun logDebug(message: String, data: String) {
             Log.d(TAG, "JS DEBUG: $message | $data")
+            ScriptDebugger.getInstance(context).log(LogLevel.DEBUG, "$message | $data", "JavaScript")
         }
 
         @JavascriptInterface
@@ -1612,6 +1617,8 @@ class JsEngine(private val context: Context) {
                     TAG,
                     "DETAILED JS ERROR: \nType: $errorType\nMessage: $errorMessage\nLine: $errorLine\nStack: $errorStack"
             )
+            val errorMsg = "Type: $errorType\nMessage: $errorMessage\nLine: $errorLine\nStack: $errorStack"
+            ScriptDebugger.getInstance(context).log(LogLevel.ERROR, errorMsg, "JavaScript Error")
         }
     }
 

@@ -5,6 +5,8 @@ import android.util.Log
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.SimplifiedUINode
 import com.ai.assistance.operit.core.tools.UIPageResultData
+import com.ai.assistance.operit.core.tools.javascript.debug.ScriptDebugger
+import com.ai.assistance.operit.core.tools.javascript.debug.LogLevel
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.util.map.NodeState
@@ -13,6 +15,9 @@ import com.ai.assistance.operit.util.map.StatefulEdge
 import kotlinx.coroutines.delay
 import com.ai.assistance.operit.core.tools.StringResultData
 import org.json.JSONObject
+import android.util.Base64
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 
 private const val TAG = "UIOperationExecutor"
 
@@ -195,6 +200,36 @@ class UIOperationExecutor(
      */
     private suspend fun executeOperation(operation: UIOperation, state: UIState): Boolean {
         Log.d(TAG, "Executing operation: ${operation::class.java.simpleName} with description: '${operation.description}'")
+        
+        val debugger = ScriptDebugger.getInstance(context)
+        debugger.log(LogLevel.INFO, "Executing: ${operation.description}", "AutomationTools")
+        
+        val result = executeOperationInternal(operation, state)
+        
+        if (debugger.isDebugging()) {
+            try {
+                val uiStateJson = Json.encodeToString(mapOf(
+                    "nodeId" to state.nodeId,
+                    "packageName" to (state.packageName ?: ""),
+                    "activity" to (state.currentActivity ?: "")
+                ))
+                
+                debugger.addAutomationStep(
+                    operation = operation::class.java.simpleName,
+                    description = operation.description,
+                    uiState = uiStateJson,
+                    success = result,
+                    error = if (!result) "Operation failed" else null
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add debug step", e)
+            }
+        }
+        
+        return result
+    }
+    
+    private suspend fun executeOperationInternal(operation: UIOperation, state: UIState): Boolean {
         return when (operation) {
             is UIOperation.Click -> {
                 // 如果提供了相对坐标，则使用get_page_info+tap的组合来实现精确点击
