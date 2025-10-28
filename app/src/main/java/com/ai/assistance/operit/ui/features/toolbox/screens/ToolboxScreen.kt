@@ -91,6 +91,7 @@ fun ToolboxScreen(
         onTextToSpeechSelected: () -> Unit,
         onSpeechToTextSelected: () -> Unit,
         onToolTesterSelected: () -> Unit,
+        onScriptsSelected: () -> Unit,
         onAgreementSelected: () -> Unit
 ) {
         // 屏幕配置信息，用于响应式布局
@@ -193,6 +194,13 @@ fun ToolboxScreen(
                                 description = stringResource(R.string.tool_log_viewer_desc),
                                 category = ToolCategory.DEVELOPMENT,
                                 onClick = onLogcatSelected
+                        ),
+                        Tool(
+                                name = stringResource(R.string.nav_scripts),
+                                icon = Icons.Default.Code,
+                                description = stringResource(R.string.tool_scripts_desc),
+                                category = ToolCategory.DEVELOPMENT,
+                                onClick = onScriptsSelected
                         )
                 )
 

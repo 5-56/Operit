@@ -20,6 +20,7 @@
     <string name="nav_assistant_config">助手配置</string>
     <string name="nav_terminal">终端</string>
     <string name="nav_toolbox">工具箱</string>
+    <string name="nav_scripts">脚本</string>
     <string name="nav_item_agreement">用户协议</string>
     <string name="nav_help">使用手册</string>
     <string name="menu">菜单</string>
@@ -97,6 +98,7 @@
     <string name="mcp">MCP</string>
     <string name="token_config_title">DeepSeek Token配置</string>
     <string name="chat_history_settings">聊天记录管理</string>
+    <string name="screen_title_scripts">脚本管理</string>
     
     <!-- 聊天记录管理界面 -->
     <string name="chat_history_manager">聊天记录管理</string>

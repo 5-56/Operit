@@ -18,6 +18,7 @@
     <string name="nav_assistant_config">Assistant Config</string>
     <string name="nav_terminal">Terminal</string>
     <string name="nav_toolbox">Toolbox</string>
+    <string name="nav_scripts">Scripts</string>
     <string name="nav_item_agreement">User Agreement</string>
     <string name="nav_help">User Manual</string>
     <string name="menu">Menu</string>
@@ -97,6 +98,7 @@
     <string name="mcp">MCP</string>
     <string name="token_config_title">DeepSeek Token Configuration</string>
     <string name="chat_history_settings">Chat History Management</string>
+    <string name="screen_title_scripts">Script Management</string>
     
     <!-- Chat History Management Screen -->
     <string name="chat_history_manager">Chat History Manager</string>
