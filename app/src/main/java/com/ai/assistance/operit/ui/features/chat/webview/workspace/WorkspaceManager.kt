@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.model.AITool
@@ -34,6 +36,7 @@ import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.features.chat.webview.WebViewHandler
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.CodeEditor
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.LanguageDetector
+import com.ai.assistance.operit.ui.features.scriptversion.ScriptVersionIntegration
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -98,6 +101,8 @@ fun WorkspaceManager(
     
     // 解绑确认对话框状态
     var showUnbindConfirmDialog by remember { mutableStateOf(false) }
+    var showVersionHistory by remember { mutableStateOf(false) }
+    var versionHistoryPath by remember { mutableStateOf<String?>(null) }
     
     // 当前活动的编辑器引用
     var activeEditor by remember { mutableStateOf<com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.NativeCodeEditor?>(null) }
@@ -155,6 +160,18 @@ fun WorkspaceManager(
             
             // 使用toolHandler代替actualViewModel.executeAITool
             toolHandler.executeTool(tool)
+            
+            // 创建版本快照
+            ScriptVersionIntegration.saveScriptVersion(
+                context = context,
+                filePath = fileInfo.path,
+                fileName = fileInfo.name,
+                content = fileInfo.content,
+                scriptType = LanguageDetector.detectLanguage(fileInfo.name),
+                commitMessage = "",
+                author = "user",
+                isAutoSave = true
+            )
             
             // 如果是HTML文件且正在预览，刷新WebView
             if (fileInfo.isHtml && filePreviewStates[fileInfo.path] == true) {
@@ -265,6 +282,22 @@ fun WorkspaceManager(
                             Icon(
                                 Icons.Default.Save,
                                 contentDescription = "Save File"
+                            )
+                        }
+                    }
+                    
+                    // 版本历史按钮
+                    if (currentFile != null) {
+                        IconButton(
+                            onClick = {
+                                versionHistoryPath = currentFile.path
+                                showVersionHistory = true
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = "Version History"
                             )
                         }
                     }
@@ -440,6 +473,34 @@ fun WorkspaceManager(
                     }
                 }
             )
+        }
+        
+        // 版本历史对话框
+        if (showVersionHistory && versionHistoryPath != null) {
+            Dialog(
+                onDismissRequest = {
+                    showVersionHistory = false
+                    versionHistoryPath = null
+                },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp
+                ) {
+                    com.ai.assistance.operit.ui.features.scriptversion.ScriptVersionHistoryScreen(
+                        filePath = versionHistoryPath!!,
+                        onNavigateBack = {
+                            showVersionHistory = false
+                            versionHistoryPath = null
+                        }
+                    )
+                }
+            }
         }
     }
 }
