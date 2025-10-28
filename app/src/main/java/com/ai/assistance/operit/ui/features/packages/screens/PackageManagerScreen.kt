@@ -50,7 +50,7 @@ import com.ai.assistance.operit.ui.features.packages.components.PackageTab
 import com.ai.assistance.operit.ui.features.packages.dialogs.AutomationFunctionExecutionDialog
 import com.ai.assistance.operit.ui.features.packages.dialogs.AutomationPackageDetailsDialog
 import com.ai.assistance.operit.ui.features.packages.dialogs.PackageDetailsDialog
-import com.ai.assistance.operit.ui.features.packages.dialogs.ScriptExecutionDialog
+import com.ai.assistance.operit.ui.features.packages.dialogs.DebugScriptExecutionDialog
 import com.ai.assistance.operit.ui.features.packages.lists.PackagesList
 import java.io.File
 import kotlinx.coroutines.launch
@@ -536,7 +536,7 @@ fun PackageManagerScreen(
 
             // Script Execution Dialog
             if (showScriptExecution && selectedTool != null && selectedPackage != null) {
-                ScriptExecutionDialog(
+                DebugScriptExecutionDialog(
                         packageName = selectedPackage!!,
                         tool = selectedTool!!,
                         packageManager = packageManager,
