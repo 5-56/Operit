@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 羲和智能助手颜色定义 -->
+    
+    <!-- 主色调 - 深蓝色，代表智慧和科技 -->
+    <color name="xihe_primary">#1976D2</color>
+    <color name="xihe_on_primary">#FFFFFF</color>
+    <color name="xihe_primary_container">#BBDEFB</color>
+    <color name="xihe_on_primary_container">#0D47A1</color>
+    
+    <!-- 辅助色 - 橙色，代表活力和创新 -->
+    <color name="xihe_secondary">#FF9800</color>
+    <color name="xihe_on_secondary">#FFFFFF</color>
+    <color name="xihe_secondary_container">#FFE0B2</color>
+    <color name="xihe_on_secondary_container">#E65100</color>
+    
+    <!-- 第三色 - 绿色，代表智能和自动化 -->
+    <color name="xihe_tertiary">#4CAF50</color>
+    <color name="xihe_on_tertiary">#FFFFFF</color>
+    <color name="xihe_tertiary_container">#C8E6C9</color>
+    <color name="xihe_on_tertiary_container">#1B5E20</color>
+    
+    <!-- 错误色 -->
+    <color name="xihe_error">#D32F2F</color>
+    <color name="xihe_on_error">#FFFFFF</color>
+    <color name="xihe_error_container">#FFCDD2</color>
+    <color name="xihe_on_error_container">#B71C1C</color>
+    
+    <!-- 背景色 -->
+    <color name="xihe_background">#FAFAFA</color>
+    <color name="xihe_on_background">#1C1B1F</color>
+    
+    <!-- 表面色 -->
+    <color name="xihe_surface">#FFFFFF</color>
+    <color name="xihe_on_surface">#1C1B1F</color>
+    <color name="xihe_surface_variant">#E7E0EC</color>
+    <color name="xihe_on_surface_variant">#49454F</color>
+    
+    <!-- 轮廓色 -->
+    <color name="xihe_outline">#79747E</color>
+    <color name="xihe_outline_variant">#CAC4D0</color>
+    
+    <!-- 其他颜色 -->
+    <color name="xihe_scrim">#000000</color>
+    <color name="xihe_inverse_surface">#313033</color>
+    <color name="xihe_inverse_on_surface">#F4EFF4</color>
+    <color name="xihe_inverse_primary">#90CAF9</color>
+    
+    <!-- 表面容器色 -->
+    <color name="xihe_surface_dim">#DDD9D9</color>
+    <color name="xihe_surface_bright">#FAFAFA</color>
+    <color name="xihe_surface_container_lowest">#FFFFFF</color>
+    <color name="xihe_surface_container_low">#F7F2FA</color>
+    <color name="xihe_surface_container">#F1ECF4</color>
+    <color name="xihe_surface_container_high">#EBE6EE</color>
+    <color name="xihe_surface_container_highest">#E6E0E9</color>
+    
+    <!-- 深色主题颜色 -->
+    <color name="xihe_primary_dark">#90CAF9</color>
+    <color name="xihe_on_primary_dark">#0D47A1</color>
+    <color name="xihe_primary_container_dark">#1565C0</color>
+    <color name="xihe_on_primary_container_dark">#E3F2FD</color>
+    
+    <color name="xihe_secondary_dark">#FFB74D</color>
+    <color name="xihe_on_secondary_dark">#E65100</color>
+    <color name="xihe_secondary_container_dark">#FF9800</color>
+    <color name="xihe_on_secondary_container_dark">#FFF3E0</color>
+    
+    <color name="xihe_tertiary_dark">#81C784</color>
+    <color name="xihe_on_tertiary_dark">#1B5E20</color>
+    <color name="xihe_tertiary_container_dark">#4CAF50</color>
+    <color name="xihe_on_tertiary_container_dark">#E8F5E8</color>
+    
+    <color name="xihe_error_dark">#EF5350</color>
+    <color name="xihe_on_error_dark">#B71C1C</color>
+    <color name="xihe_error_container_dark">#D32F2F</color>
+    <color name="xihe_on_error_container_dark">#FFEBEE</color>
+    
+    <color name="xihe_background_dark">#121212</color>
+    <color name="xihe_on_background_dark">#E6E0E9</color>
+    
+    <color name="xihe_surface_dark">#121212</color>
+    <color name="xihe_on_surface_dark">#E6E0E9</color>
+    <color name="xihe_surface_variant_dark">#49454F</color>
+    <color name="xihe_on_surface_variant_dark">#CAC4D0</color>
+    
+    <color name="xihe_outline_dark">#938F99</color>
+    <color name="xihe_outline_variant_dark">#49454F</color>
+    
+    <color name="xihe_scrim_dark">#000000</color>
+    <color name="xihe_inverse_surface_dark">#E6E0E9</color>
+    <color name="xihe_inverse_on_surface_dark">#313033</color>
+    <color name="xihe_inverse_primary_dark">#1976D2</color>
+    
+    <color name="xihe_surface_dim_dark">#0F0D13</color>
+    <color name="xihe_surface_bright_dark">#36343B</color>
+    <color name="xihe_surface_container_lowest_dark">#0C0A10</color>
+    <color name="xihe_surface_container_low_dark">#1D1B20</color>
+    <color name="xihe_surface_container_dark">#211F26</color>
+    <color name="xihe_surface_container_high_dark">#2B2930</color>
+    <color name="xihe_surface_container_highest_dark">#36343B</color>
+    
+    <!-- 通用颜色 -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    
+    <!-- 状态颜色 -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FF9800</color>
+    <color name="error">#F44336</color>
+    <color name="info">#2196F3</color>
+    
+    <!-- 聊天界面颜色 -->
+    <color name="chat_user_message">#E3F2FD</color>
+    <color name="chat_ai_message">#F5F5F5</color>
+    <color name="chat_system_message">#FFF3E0</color>
+    <color name="chat_typing_indicator">#90CAF9</color>
+    
+    <!-- 自动化状态颜色 -->
+    <color name="automation_running">#4CAF50</color>
+    <color name="automation_stopped">#9E9E9E</color>
+    <color name="automation_error">#F44336</color>
+    <color name="automation_warning">#FF9800</color>
+</resources>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 羲和智能助手主题 -->
+    <style name="Theme.Xihe" parent="Theme.Material3.DayNight">
+        <!-- 主色调 -->
+        <item name="colorPrimary">@color/xihe_primary</item>
+        <item name="colorOnPrimary">@color/xihe_on_primary</item>
+        <item name="colorPrimaryContainer">@color/xihe_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/xihe_on_primary_container</item>
+        
+        <!-- 辅助色 -->
+        <item name="colorSecondary">@color/xihe_secondary</item>
+        <item name="colorOnSecondary">@color/xihe_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/xihe_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/xihe_on_secondary_container</item>
+        
+        <!-- 第三色 -->
+        <item name="colorTertiary">@color/xihe_tertiary</item>
+        <item name="colorOnTertiary">@color/xihe_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/xihe_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/xihe_on_tertiary_container</item>
+        
+        <!-- 错误色 -->
+        <item name="colorError">@color/xihe_error</item>
+        <item name="colorOnError">@color/xihe_on_error</item>
+        <item name="colorErrorContainer">@color/xihe_error_container</item>
+        <item name="colorOnErrorContainer">@color/xihe_on_error_container</item>
+        
+        <!-- 背景色 -->
+        <item name="android:colorBackground">@color/xihe_background</item>
+        <item name="colorOnBackground">@color/xihe_on_background</item>
+        
+        <!-- 表面色 -->
+        <item name="colorSurface">@color/xihe_surface</item>
+        <item name="colorOnSurface">@color/xihe_on_surface</item>
+        <item name="colorSurfaceVariant">@color/xihe_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/xihe_on_surface_variant</item>
+        
+        <!-- 轮廓色 -->
+        <item name="colorOutline">@color/xihe_outline</item>
+        <item name="colorOutlineVariant">@color/xihe_outline_variant</item>
+        
+        <!-- 其他颜色 -->
+        <item name="colorScrim">@color/xihe_scrim</item>
+        <item name="colorInverseSurface">@color/xihe_inverse_surface</item>
+        <item name="colorInverseOnSurface">@color/xihe_inverse_on_surface</item>
+        <item name="colorInversePrimary">@color/xihe_inverse_primary</item>
+        
+        <!-- 表面容器色 -->
+        <item name="colorSurfaceDim">@color/xihe_surface_dim</item>
+        <item name="colorSurfaceBright">@color/xihe_surface_bright</item>
+        <item name="colorSurfaceContainerLowest">@color/xihe_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/xihe_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/xihe_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/xihe_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/xihe_surface_container_highest</item>
+        
+        <!-- 状态栏 -->
+        <item name="android:statusBarColor">@color/xihe_primary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        
+        <!-- 导航栏 -->
+        <item name="android:navigationBarColor">@color/xihe_surface</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        
+        <!-- 窗口背景 -->
+        <item name="android:windowBackground">@color/xihe_background</item>
+        
+        <!-- 字体 -->
+        <item name="android:fontFamily">sans-serif</item>
+        
+        <!-- 动画 -->
+        <item name="android:windowAnimationStyle">@style/XiheWindowAnimation</item>
+        
+        <!-- 支持高刷新率 -->
+        <item name="android:allowHighRefreshRate" tools:targetApi="31">true</item>
+    </style>
+    
+    <!-- 窗口动画 -->
+    <style name="XiheWindowAnimation" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item>
+        <item name="android:activityOpenExitAnimation">@anim/slide_out_left</item>
+        <item name="android:activityCloseEnterAnimation">@anim/slide_in_left</item>
+        <item name="android:activityCloseExitAnimation">@anim/slide_out_right</item>
+    </style>
+    
+    <!-- 深色主题 -->
+    <style name="Theme.Xihe.Dark" parent="Theme.Xihe">
+        <!-- 深色主题颜色覆盖 -->
+        <item name="colorPrimary">@color/xihe_primary_dark</item>
+        <item name="colorOnPrimary">@color/xihe_on_primary_dark</item>
+        <item name="colorPrimaryContainer">@color/xihe_primary_container_dark</item>
+        <item name="colorOnPrimaryContainer">@color/xihe_on_primary_container_dark</item>
+        
+        <item name="colorSecondary">@color/xihe_secondary_dark</item>
+        <item name="colorOnSecondary">@color/xihe_on_secondary_dark</item>
+        <item name="colorSecondaryContainer">@color/xihe_secondary_container_dark</item>
+        <item name="colorOnSecondaryContainer">@color/xihe_on_secondary_container_dark</item>
+        
+        <item name="colorTertiary">@color/xihe_tertiary_dark</item>
+        <item name="colorOnTertiary">@color/xihe_on_tertiary_dark</item>
+        <item name="colorTertiaryContainer">@color/xihe_tertiary_container_dark</item>
+        <item name="colorOnTertiaryContainer">@color/xihe_on_tertiary_container_dark</item>
+        
+        <item name="colorError">@color/xihe_error_dark</item>
+        <item name="colorOnError">@color/xihe_on_error_dark</item>
+        <item name="colorErrorContainer">@color/xihe_error_container_dark</item>
+        <item name="colorOnErrorContainer">@color/xihe_on_error_container_dark</item>
+        
+        <item name="android:colorBackground">@color/xihe_background_dark</item>
+        <item name="colorOnBackground">@color/xihe_on_background_dark</item>
+        
+        <item name="colorSurface">@color/xihe_surface_dark</item>
+        <item name="colorOnSurface">@color/xihe_on_surface_dark</item>
+        <item name="colorSurfaceVariant">@color/xihe_surface_variant_dark</item>
+        <item name="colorOnSurfaceVariant">@color/xihe_on_surface_variant_dark</item>
+        
+        <item name="colorOutline">@color/xihe_outline_dark</item>
+        <item name="colorOutlineVariant">@color/xihe_outline_variant_dark</item>
+        
+        <item name="colorScrim">@color/xihe_scrim_dark</item>
+        <item name="colorInverseSurface">@color/xihe_inverse_surface_dark</item>
+        <item name="colorInverseOnSurface">@color/xihe_inverse_on_surface_dark</item>
+        <item name="colorInversePrimary">@color/xihe_inverse_primary_dark</item>
+        
+        <item name="colorSurfaceDim">@color/xihe_surface_dim_dark</item>
+        <item name="colorSurfaceBright">@color/xihe_surface_bright_dark</item>
+        <item name="colorSurfaceContainerLowest">@color/xihe_surface_container_lowest_dark</item>
+        <item name="colorSurfaceContainerLow">@color/xihe_surface_container_low_dark</item>
+        <item name="colorSurfaceContainer">@color/xihe_surface_container_dark</item>
+        <item name="colorSurfaceContainerHigh">@color/xihe_surface_container_high_dark</item>
+        <item name="colorSurfaceContainerHighest">@color/xihe_surface_container_highest_dark</item>
+        
+        <!-- 状态栏 -->
+        <item name="android:statusBarColor">@color/xihe_primary_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        
+        <!-- 导航栏 -->
+        <item name="android:navigationBarColor">@color/xihe_surface_dark</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        
+        <!-- 窗口背景 -->
+        <item name="android:windowBackground">@color/xihe_background_dark</item>
+    </style>
+</resources>

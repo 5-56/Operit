@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 包含所有数据 -->
+    <include domain="sharedpref" path="."/>
+    <include domain="database" path="."/>
+    <include domain="file" path="."/>
+    <include domain="external" path="."/>
+    
+    <!-- 排除敏感数据 -->
+    <exclude domain="sharedpref" path="api_keys.xml"/>
+    <exclude domain="sharedpref" path="tokens.xml"/>
+    <exclude domain="sharedpref" path="passwords.xml"/>
+    
+    <!-- 排除临时文件 -->
+    <exclude domain="file" path="temp/"/>
+    <exclude domain="file" path="cache/"/>
+    <exclude domain="file" path="logs/"/>
+    
+    <!-- 排除大文件 -->
+    <exclude domain="file" path="media/"/>
+    <exclude domain="file" path="downloads/"/>
+</full-backup-content>

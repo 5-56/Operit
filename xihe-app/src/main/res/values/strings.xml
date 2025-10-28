@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用基本信息 -->
+    <string name="app_name">羲和智能助手</string>
+    <string name="app_description">更智能、更自动化的AI助手</string>
+    <string name="default_profile">默认用户</string>
+    
+    <!-- 导航项目 -->
+    <string name="nav_ai_chat">AI对话</string>
+    <string name="nav_assistant_config">助手配置</string>
+    <string name="nav_smart_automation">智能自动化</string>
+    <string name="nav_memory_base">记忆库</string>
+    <string name="nav_token_config">Token配置</string>
+    <string name="nav_toolbox">工具箱</string>
+    <string name="nav_voice_control">语音控制</string>
+    <string name="nav_settings">设置</string>
+    <string name="nav_help">帮助</string>
+    <string name="nav_about">关于</string>
+    
+    <!-- 聊天界面 -->
+    <string name="chat_input_hint">输入消息...</string>
+    <string name="chat_send">发送</string>
+    <string name="chat_voice_input">语音输入</string>
+    <string name="chat_attach_file">附件</string>
+    <string name="chat_clear">清空</string>
+    <string name="chat_retry">重试</string>
+    <string name="chat_copy">复制</string>
+    <string name="chat_share">分享</string>
+    <string name="chat_edit">编辑</string>
+    <string name="chat_delete">删除</string>
+    
+    <!-- 权限相关 -->
+    <string name="permission_microphone">麦克风权限</string>
+    <string name="permission_storage">存储权限</string>
+    <string name="permission_location">位置权限</string>
+    <string name="permission_camera">相机权限</string>
+    <string name="permission_notification">通知权限</string>
+    <string name="permission_overlay">悬浮窗权限</string>
+    <string name="permission_required">需要权限才能使用此功能</string>
+    <string name="permission_granted">权限已授予</string>
+    <string name="permission_denied">权限被拒绝</string>
+    <string name="microphone_permission_denied">麦克风权限被拒绝</string>
+    
+    <!-- 智能自动化 -->
+    <string name="automation_title">智能自动化</string>
+    <string name="automation_create_task">创建任务</string>
+    <string name="automation_create_workflow">创建工作流</string>
+    <string name="automation_task_name">任务名称</string>
+    <string name="automation_task_description">任务描述</string>
+    <string name="automation_trigger">触发器</string>
+    <string name="automation_actions">动作</string>
+    <string name="automation_enabled">已启用</string>
+    <string name="automation_disabled">已禁用</string>
+    <string name="automation_running">运行中</string>
+    <string name="automation_stopped">已停止</string>
+    <string name="automation_logs">执行日志</string>
+    
+    <!-- 语音控制 -->
+    <string name="voice_control_title">语音控制</string>
+    <string name="voice_control_listening">正在聆听...</string>
+    <string name="voice_control_processing">处理中...</string>
+    <string name="voice_control_speaking">正在说话...</string>
+    <string name="voice_control_stop">停止</string>
+    <string name="voice_control_start">开始</string>
+    <string name="voice_control_settings">语音设置</string>
+    
+    <!-- 工具箱 -->
+    <string name="toolbox_title">智能工具箱</string>
+    <string name="toolbox_file_manager">文件管理</string>
+    <string name="toolbox_system_info">系统信息</string>
+    <string name="toolbox_network_tools">网络工具</string>
+    <string name="toolbox_media_tools">媒体工具</string>
+    <string name="toolbox_automation_tools">自动化工具</string>
+    <string name="toolbox_ai_tools">AI工具</string>
+    
+    <!-- 设置 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_general">常规</string>
+    <string name="settings_appearance">外观</string>
+    <string name="settings_ai">AI设置</string>
+    <string name="settings_automation">自动化</string>
+    <string name="settings_privacy">隐私</string>
+    <string name="settings_about">关于</string>
+    
+    <!-- 通用 -->
+    <string name="ok">确定</string>
+    <string name="cancel">取消</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    <string name="add">添加</string>
+    <string name="remove">移除</string>
+    <string name="search">搜索</string>
+    <string name="filter">筛选</string>
+    <string name="sort">排序</string>
+    <string name="refresh">刷新</string>
+    <string name="loading">加载中...</string>
+    <string name="error">错误</string>
+    <string name="success">成功</string>
+    <string name="warning">警告</string>
+    <string name="info">信息</string>
+    
+    <!-- 错误消息 -->
+    <string name="error_network">网络连接失败</string>
+    <string name="error_api_key">API密钥无效</string>
+    <string name="error_permission">权限不足</string>
+    <string name="error_file_not_found">文件未找到</string>
+    <string name="error_unknown">未知错误</string>
+    
+    <!-- 提示消息 -->
+    <string name="toast_saved">已保存</string>
+    <string name="toast_deleted">已删除</string>
+    <string name="toast_copied">已复制</string>
+    <string name="toast_shared">已分享</string>
+    <string name="toast_updated">已更新</string>
+    <string name="toast_created">已创建</string>
+    
+    <!-- 退出确认 -->
+    <string name="press_back_again_to_exit">再按一次返回键退出</string>
+    <string name="exit_confirmation">确定要退出应用吗？</string>
+    
+    <!-- 插件加载 -->
+    <string name="plugin_loading">正在加载插件...</string>
+    <string name="plugin_loading_skipped">已跳过插件加载</string>
+    <string name="plugin_loading_failed">插件加载失败</string>
+    <string name="plugin_loading_success">插件加载成功</string>
+    
+    <!-- 模型建议 -->
+    <string name="model_suggestion_title">模型建议</string>
+    <string name="model_suggestion_message">检测到您使用的是免费模型，建议切换到更智能的模型以获得更好的体验</string>
+    <string name="change_model">更换模型</string>
+    <string name="ignore">忽略</string>
+    
+    <!-- 确认码相关 -->
+    <string name="confirmation_code_copied">确认码已复制到剪贴板</string>
+</resources>
