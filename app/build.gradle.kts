@@ -340,6 +340,9 @@ dependencies {
     implementation(libs.objectbox.kotlin)
     kapt(libs.objectbox.processor)
     
+    // Google Play Services Location
+    implementation(libs.play.services.location)
+    
     // MCP Kotlin SDK with version compatibility fix
     implementation("io.modelcontextprotocol.sdk:mcp:0.7.0") {
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-serialization-json")
