@@ -8,6 +8,7 @@ import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.flow.toList
 
 /**
  * 自动化工具集，提供UI自动化相关的AI工具
@@ -22,10 +23,18 @@ class AutomationTools(
 
     private val packageManager by lazy { AutomationPackageManager.getInstance(context) }
     private val uiRouter by lazy { UIRouter(context, toolHandler) }
+    private val scriptExecutionEngine by lazy { ScriptExecutionEngine(context, toolHandler) }
     
     // 缓存当前的执行计划
     private var currentPlan: RoutePlan? = null
     private var currentFunctionName: String? = null
+    
+    // 内存中的脚本存储 (在实际应用中应使用持久化存储)
+    private val scripts = mutableMapOf<String, AutomationScript>().apply {
+        ScriptExamples.getAllExamples().forEach { script ->
+            this[script.id] = script
+        }
+    }
 
     /**
      * 搜索是否存在对应包名/应用名称的自动化配置
@@ -340,4 +349,190 @@ class AutomationTools(
             )
         }
     }
-} 
+
+    /**
+     * List available automation scripts
+     */
+    suspend fun listScripts(tool: AITool): ToolResult {
+        Log.d(TAG, "Listing automation scripts")
+        
+        try {
+            val packageName = tool.parameters.find { it.name == "package_name" }?.value
+            
+            val filteredScripts = if (packageName != null) {
+                scripts.values.filter { it.packageName == packageName }
+            } else {
+                scripts.values.toList()
+            }
+            
+            return ToolResult(
+                toolName = tool.name,
+                success = true,
+                result = ScriptListResult(
+                    scripts = filteredScripts.map { script ->
+                        ScriptListResult.ScriptInfo(
+                            id = script.id,
+                            name = script.name,
+                            description = script.description,
+                            packageName = script.packageName,
+                            stepCount = script.steps.size,
+                            requiredParameters = script.requiredParameters.map { it.key }
+                        )
+                    },
+                    totalCount = filteredScripts.size
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error listing scripts", e)
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "列出脚本时发生错误: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Execute an automation script
+     */
+    suspend fun executeScript(tool: AITool): ToolResult {
+        Log.d(TAG, "Executing automation script")
+        
+        val scriptId = tool.parameters.find { it.name == "script_id" }?.value
+        if (scriptId.isNullOrBlank()) {
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "必须提供 script_id 参数"
+            )
+        }
+        
+        val script = scripts[scriptId]
+        if (script == null) {
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "未找到ID为 '$scriptId' 的脚本"
+            )
+        }
+        
+        try {
+            val parametersJson = tool.parameters.find { it.name == "parameters" }?.value ?: "{}"
+            val json = Json { ignoreUnknownKeys = true }
+            val providedParameters = try {
+                json.decodeFromString<Map<String, String>>(parametersJson)
+            } catch (e: Exception) {
+                return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = "参数格式错误，请提供有效的JSON格式: ${e.message}"
+                )
+            }
+            
+            val config = script.packageName.let { packageManager.getConfigByAppPackageName(it) }
+            
+            val executionStateFlow = scriptExecutionEngine.executeScript(
+                script,
+                providedParameters,
+                config
+            )
+            
+            val states = executionStateFlow.toList()
+            val finalState = states.lastOrNull()
+            
+            when (finalState) {
+                is ScriptExecutionState.Completed -> {
+                    return ToolResult(
+                        toolName = tool.name,
+                        success = true,
+                        result = ScriptExecutionResultData(
+                            scriptId = script.id,
+                            scriptName = script.name,
+                            success = true,
+                            completedSteps = finalState.completedSteps,
+                            totalSteps = finalState.totalSteps,
+                            executionTimeMs = finalState.executionTimeMs,
+                            logs = finalState.logs.map { "${it.stepNumber}: ${it.message}" }
+                        )
+                    )
+                }
+                is ScriptExecutionState.Failed -> {
+                    return ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = ScriptExecutionResultData(
+                            scriptId = script.id,
+                            scriptName = script.name,
+                            success = false,
+                            completedSteps = finalState.currentStep,
+                            totalSteps = finalState.totalSteps,
+                            executionTimeMs = finalState.executionTimeMs,
+                            logs = finalState.logs.map { "${it.stepNumber}: ${it.message}" }
+                        ),
+                        error = finalState.error
+                    )
+                }
+                else -> {
+                    return ToolResult(
+                        toolName = tool.name,
+                        success = false,
+                        result = StringResultData(""),
+                        error = "脚本执行未完成或状态异常"
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error executing script", e)
+            return ToolResult(
+                toolName = tool.name,
+                success = false,
+                result = StringResultData(""),
+                error = "执行脚本时发生错误: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Register a new script
+     */
+    fun registerScript(script: AutomationScript) {
+        scripts[script.id] = script
+        Log.d(TAG, "Registered script: ${script.id} - ${script.name}")
+    }
+
+    /**
+     * Remove a script
+     */
+    fun removeScript(scriptId: String) {
+        scripts.remove(scriptId)
+        Log.d(TAG, "Removed script: $scriptId")
+    }
+}
+
+data class ScriptListResult(
+    val scripts: List<ScriptInfo>,
+    val totalCount: Int
+) {
+    data class ScriptInfo(
+        val id: String,
+        val name: String,
+        val description: String,
+        val packageName: String,
+        val stepCount: Int,
+        val requiredParameters: List<String>
+    )
+}
+
+data class ScriptExecutionResultData(
+    val scriptId: String,
+    val scriptName: String,
+    val success: Boolean,
+    val completedSteps: Int,
+    val totalSteps: Int,
+    val executionTimeMs: Long,
+    val logs: List<String>
+) 
