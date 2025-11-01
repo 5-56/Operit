@@ -10,6 +10,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 import com.ai.assistance.operit.util.FileUtils
+import com.ai.assistance.operit.services.ScriptLibraryService
+import kotlinx.coroutines.runBlocking
 
 @Serializable
 data class BackupManifest(
@@ -23,6 +25,7 @@ class WorkspaceBackupManager(private val context: Context) {
         private const val TAG = "WorkspaceBackupManager"
         private const val BACKUP_DIR_NAME = ".backup"
         private const val OBJECTS_DIR_NAME = "objects"
+        private const val SCRIPT_LIBRARY_ENTRY = "__script_library__/bundle.operit-scripts"
 
         @Volatile
         private var INSTANCE: WorkspaceBackupManager? = null
@@ -109,6 +112,23 @@ class WorkspaceBackupManager(private val context: Context) {
                 }
             }
 
+        // Include Script Library backup in the manifest
+        try {
+            val scriptService = ScriptLibraryService.getInstance(context)
+            val backupResult = runBlocking { scriptService.createBackup() }
+            if (backupResult.success && backupResult.file != null) {
+                val hash = getFileHash(backupResult.file)
+                newManifestFiles[SCRIPT_LIBRARY_ENTRY] = hash
+                val objectFile = File(objectsDir, hash)
+                if (!objectFile.exists()) {
+                    backupResult.file.copyTo(objectFile, overwrite = true)
+                }
+                Log.d(TAG, "Included Script Library backup in workspace manifest")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to include Script Library backup", e)
+        }
+
         val manifest = BackupManifest(timestamp = newTimestamp, files = newManifestFiles)
         val manifestFile = File(backupDir, "$newTimestamp.json")
         try {
@@ -161,6 +181,28 @@ class WorkspaceBackupManager(private val context: Context) {
         // 2. Restore/update files from manifest
         Log.d(TAG, "Step 2: Restoring and updating files from the target manifest...")
         manifestFiles.forEach { (relativePath, hash) ->
+            // Special handling for Script Library backup
+            if (relativePath == SCRIPT_LIBRARY_ENTRY) {
+                val objectFile = File(objectsDir, hash)
+                if (objectFile.exists()) {
+                    try {
+                        Log.d(TAG, "Restoring Script Library from backup")
+                        // Script Library restore is handled separately via ScriptLibraryService
+                        val scriptService = ScriptLibraryService.getInstance(context)
+                        runBlocking {
+                            scriptService.restoreBackup(
+                                fileUri = android.net.Uri.fromFile(objectFile),
+                                replaceExisting = true
+                            )
+                        }
+                        Log.d(TAG, "Script Library restored successfully")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to restore Script Library", e)
+                    }
+                }
+                return@forEach
+            }
+
             val targetFile = File(workspaceDir, relativePath)
             val objectFile = File(objectsDir, hash)
 
@@ -211,5 +253,26 @@ class WorkspaceBackupManager(private val context: Context) {
             }
         }
         return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Gets all available backup manifests for a workspace
+     */
+    fun getAvailableBackups(workspacePath: String): List<Long> {
+        val workspaceDir = File(workspacePath)
+        if (!workspaceDir.exists() || !workspaceDir.isDirectory) {
+            return emptyList()
+        }
+
+        val backupDir = File(workspaceDir, BACKUP_DIR_NAME)
+        if (!backupDir.exists()) {
+            return emptyList()
+        }
+
+        return backupDir.listFiles { file ->
+            file.isFile && file.name.endsWith(".json")
+        }?.mapNotNull {
+            it.nameWithoutExtension.toLongOrNull()
+        }?.sorted() ?: emptyList()
     }
 } 
