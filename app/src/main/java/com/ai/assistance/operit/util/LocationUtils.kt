@@ -205,4 +205,32 @@ object LocationUtils {
         }
         return hasPermission
     }
+
+    /**
+     * 计算两个经纬度之间的距离（米）。
+     */
+    fun distanceBetweenMeters(
+        startLatitude: Double,
+        startLongitude: Double,
+        endLatitude: Double,
+        endLongitude: Double
+    ): Float {
+        val results = FloatArray(1)
+        Location.distanceBetween(startLatitude, startLongitude, endLatitude, endLongitude, results)
+        return results[0]
+    }
+
+    /**
+     * 判断当前位置是否位于给定的地理围栏范围内。
+     */
+    fun isWithinGeofence(
+        currentLatitude: Double,
+        currentLongitude: Double,
+        centerLatitude: Double,
+        centerLongitude: Double,
+        radiusMeters: Float
+    ): Boolean {
+        val distance = distanceBetweenMeters(currentLatitude, currentLongitude, centerLatitude, centerLongitude)
+        return distance <= radiusMeters
+    }
 }
